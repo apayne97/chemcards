@@ -1,0 +1,1 @@
+curl_command = 'curl -Lfv -o filename.zip -u USERNAME:PASSWORD https://go.drugbank.com/releases/5-1-12/downloads/all-full-database'

@@ -1,0 +1,56 @@
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "term": {
+            "_metadata.drug.is_drug": true
+          }
+        }
+      ],
+      "filter": [
+        {
+          "bool": {
+            "should": [
+              {
+                "terms": {
+                  "molecule_type": [
+                    "Small molecule"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "should": [],
+      "must_not": []
+    }
+  },
+  "track_total_hits": true,
+  "size": 20,
+  "from": 0,
+  "_source": [
+    "molecule_chembl_id",
+    "pref_name",
+    "molecule_synonyms",
+    "max_phase",
+    "_metadata.drug.drug_data.applicants",
+    "usan_stem",
+    "usan_year",
+    "first_approval",
+    "_metadata.atc_classifications",
+    "usan_stem_definition",
+    "_metadata.drug.drug_data.usan_stem_substem",
+    "indication_class",
+    "_metadata.drug.drug_data.sc_patent",
+    "molecule_structures.canonical_smiles",
+    "withdrawn_flag",
+    "orphan"
+  ],
+  "sort": [
+    {
+      "max_phase": "desc"
+    }
+  ]
+}
