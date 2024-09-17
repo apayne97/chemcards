@@ -18,7 +18,7 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
 ]
-dependencies = []
+dependencies = ["rdkit", "pydantic", "chembl_webresource_client", "tqdm"]
 
 [project.urls]
 "Homepage" = "https://github.com/apayne97"
@@ -26,6 +26,7 @@ dependencies = []
 
 [project.scripts]
 chemcards = "chemcards.chemcards:main"
+download_chembl = 'chemcards.database.services.chembl:main'
 
 [tool.setuptools.packages.find]
 where = ["."]
