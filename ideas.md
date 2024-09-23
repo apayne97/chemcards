@@ -39,3 +39,4 @@ The most difficult version would be to have the Mastering chemistry-esque "draw 
 - use `generators` to create questions from the possible choices
 - use tkinter to interact with the questions
 - save question + possible answers + chosen answer + correct answer into i.e. a CSV
+- add GUI molecule drawing interface from, i.e. https://github.com/nicemicro/nicemolecules/tree/main

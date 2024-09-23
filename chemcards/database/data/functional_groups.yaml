@@ -14,9 +14,21 @@
 - name: 1,2-oxazole
   category: oxazole
   smarts: "o1nccc1"
+- name: 1,2-thiazole
+  category: thiazole
+  smarts: "s1nccc1"
 - name: 1,3-oxazole
   category: oxazole
   smarts: "o1cncc1"
+- name: 1,3-thiazole
+  category: thiazole
+  smarts: "s1cncc1"
+- name: 1,2,4-triazole
+  category: triazole
+  smarts: "n1ncnc1"
+- name: 1,2,3-triazole
+  category: triazole
+  smarts: "n1nncc1"
 - name: pyridine
   smarts: "n1ccccc1"
 - name: indole
