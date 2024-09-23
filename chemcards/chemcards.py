@@ -1,4 +1,4 @@
-from chemcards.gui.core import MainWindow
+from chemcards.gui.mainwindow import MainWindow
 
 
 def main():
@@ -6,5 +6,5 @@ def main():
     main_window.start()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
