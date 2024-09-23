@@ -11,7 +11,7 @@ It would be nice to organize / categorize the questions so that you could focus 
 
 At a minimum the "game" could be played in a terminal, but even better would be able to host a local web page that would have different kinds of quiz questions, etc
 
-Types of questions:
+# Types of questions:
 Multiple choice:
 - pick the functional group these drugs have in common (easy - structures of drugs, hard - name of class of drugs)
 - pick the target of a drug, drug for target
@@ -23,7 +23,7 @@ Fill in the blank (I think this might suck without some kind of text-processing,
 The most difficult version would be to have the Mastering chemistry-esque "draw in the functional group" type of question
 
 
-Features
+# Features
 - memory of what questions have been asked with your guesses + answers; maybe even a report of what kinds of questions you got right / wrong etc
 
 
