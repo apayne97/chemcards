@@ -33,3 +33,5 @@
   smarts: "n1ccccc1"
 - name: indole
   smarts: "c1ccc2nccc2c1"
+- name: phenothiazine
+  smarts: "*-[#7]-1-c2ccccc2-[#16]-c2ccccc-12"

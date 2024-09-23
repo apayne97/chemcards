@@ -6,7 +6,7 @@ import ttkbootstrap as tb
 from chemcards.database.core import MoleculeDB
 from chemcards.flashcards.core import FlashCardGeneratorBase
 from chemcards.flashcards.filters import MissingTargetFilter
-from chemcards.flashcards.multiplechoice import MultipleChoiceGenerator
+from chemcards.flashcards.multiplechoice import MultipleChoiceMoleculeToTargetGenerator, MultipleChoiceMoleculeToNameGenerator
 from chemcards.gui.core import PaddingAndSize, FontDefaults
 from chemcards.gui.molecules import MoleculeViz
 
@@ -102,8 +102,8 @@ class QuizBase:
         back_to_main_menu.pack()
 
 
-class MultipleChoiceQuiz(QuizBase):
-    name = "Multiple Choice Quiz"
+class MultipleChoiceQuizBase(QuizBase):
+    name = "Multiple Choice Quiz Base"
 
     def make_frames(self):
         self.title_frame = tb.Frame(self.frame)
@@ -117,12 +117,6 @@ class MultipleChoiceQuiz(QuizBase):
         self.display_frame = tb.Frame(self.frame)
         self.display_frame.pack(
             side="right", pady=PaddingAndSize.between, padx=PaddingAndSize.between
-        )
-
-    def load_molecule_database(self):
-        mdb = MoleculeDB.load()
-        self.question_generator = MultipleChoiceGenerator(
-            mdb, filters=[MissingTargetFilter()]
         )
 
     def add_check_answer_button(self):
@@ -224,3 +218,19 @@ class MultipleChoiceQuiz(QuizBase):
         self.total_number_of_questions += 1
         if option_selected == self.current_question.answer:
             self.correct += 1
+
+
+class MultipleChoiceMoleculeToTargetQuiz(MultipleChoiceQuizBase):
+    name = MultipleChoiceMoleculeToTargetGenerator.name
+
+    def load_molecule_database(self):
+        self.molecule_db = MoleculeDB.load()
+        self.question_generator = MultipleChoiceMoleculeToTargetGenerator(self.molecule_db)
+
+
+class MultipleChoiceMoleculeToNameQuiz(MultipleChoiceQuizBase):
+    name = MultipleChoiceMoleculeToNameGenerator.name
+
+    def load_molecule_database(self):
+        self.molecule_db = MoleculeDB.load()
+        self.question_generator = MultipleChoiceMoleculeToNameGenerator(self.molecule_db)

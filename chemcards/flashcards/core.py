@@ -24,6 +24,12 @@ class FilterBase:
 
 class FlashCardGeneratorBase:
 
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        return "FlashCardGeneratorBase"
+
     def __init__(self, molecule_db: MoleculeDB, filters: list[FilterBase] = ()):
         self.molecule_db = self.apply_filters(molecule_db, filters)
         self.filters = filters
