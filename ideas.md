@@ -26,17 +26,19 @@ The most difficult version would be to have the Mastering chemistry-esque "draw 
 # Features
 - memory of what questions have been asked with your guesses + answers; maybe even a report of what kinds of questions you got right / wrong etc
 
+# To Do
+- [x] import from chembl
+- [x] save json files of imported data
+- [x] use rdkit for processing molecules
+- [x] use importlib resources to load those in
+- [x] construct a generator using some filtering logic
+- [x] use tkinter to interact with the questions
+- [x] use `generators` to create questions from the possible choices
+
 
 # Design Ideas
 - import from Drug Bank, etc
   - Drug Bank
-  - chembl
   - pubchem
-- use save json files of imported data
-- use rdkit for processing molecules
-- use importlib resources to load those in
-- construct a generator using some filtering logic
-- use `generators` to create questions from the possible choices
-- use tkinter to interact with the questions
 - save question + possible answers + chosen answer + correct answer into i.e. a CSV
 - add GUI molecule drawing interface from, i.e. https://github.com/nicemicro/nicemolecules/tree/main

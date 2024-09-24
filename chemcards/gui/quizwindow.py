@@ -101,9 +101,12 @@ class QuizBase:
         )
         back_to_main_menu.pack()
 
+class MultipleChoiceTextToImageQuizBase(QuizBase):
+    name = "Multiple Choice (Text to Image) Quiz Base"
 
-class MultipleChoiceQuizBase(QuizBase):
-    name = "Multiple Choice Quiz Base"
+
+class MultipleChoiceImageToTextQuizBase(QuizBase):
+    name = "Multiple Choice (Image to Text) Quiz Base"
 
     def make_frames(self):
         self.title_frame = tb.Frame(self.frame)
@@ -220,7 +223,7 @@ class MultipleChoiceQuizBase(QuizBase):
             self.correct += 1
 
 
-class MultipleChoiceMoleculeToTargetQuiz(MultipleChoiceQuizBase):
+class MultipleChoiceMoleculeToTargetQuiz(MultipleChoiceImageToTextQuizBase):
     name = MultipleChoiceMoleculeToTargetGenerator.name
 
     def load_molecule_database(self):
@@ -228,7 +231,7 @@ class MultipleChoiceMoleculeToTargetQuiz(MultipleChoiceQuizBase):
         self.question_generator = MultipleChoiceMoleculeToTargetGenerator(self.molecule_db)
 
 
-class MultipleChoiceMoleculeToNameQuiz(MultipleChoiceQuizBase):
+class MultipleChoiceMoleculeToNameQuiz(MultipleChoiceImageToTextQuizBase):
     name = MultipleChoiceMoleculeToNameGenerator.name
 
     def load_molecule_database(self):
