@@ -4,7 +4,7 @@ import ttkbootstrap as tb
 
 from chemcards.gui.core import PaddingAndSize, FontDefaults
 from chemcards.gui.quizwindow import QuizBase, MultipleChoiceMoleculeToTargetQuiz, MultipleChoiceMoleculeToNameQuiz
-
+from functools import partial
 # QUIZZES = [MultipleChoiceMoleculeToTargetQuiz, MultipleChoiceMoleculeToNameQuiz]
 
 QUIZZES = {quiz.name: quiz for quiz in [MultipleChoiceMoleculeToTargetQuiz, MultipleChoiceMoleculeToNameQuiz]}
@@ -56,9 +56,10 @@ class MainWindow:
 
     def add_quiz_buttons(self):
         for name in QUIZZES.keys():
+            partial_func = partial(self.start_quiz, name)
             quiz_button = tb.Button(
                 text=name,
-                command=lambda: self.start_quiz(name),
+                command=partial_func,
                 bootstyle="primary.TButton",
             )
             quiz_button.pack(pady=PaddingAndSize.between)
