@@ -35,3 +35,11 @@
   smarts: "c1ccc2nccc2c1"
 - name: phenothiazine
   smarts: "*-[#7]-1-c2ccccc2-[#16]-c2ccccc-12"
+- name: acyl hydrazine
+  smarts: "[N;R0][N;R0]C(=O)"
+- name: imine
+  smarts: "[#1,#6][CX3](=[NX2][#1,#6&!$([CX3]=[OX1,SX1,NX2])])[#1,#6]"
+- name: acid anhydride
+  smarts: "[CX3](=[OX1])[OX2][CX3](=[OX1])"
+- name: beta-keto/anhydride
+  smarts: "[C,c](=O)[CX4,CR0X3,O][C,c](=O)"

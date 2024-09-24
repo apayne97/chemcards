@@ -34,7 +34,12 @@ The most difficult version would be to have the Mastering chemistry-esque "draw 
 - [x] construct a generator using some filtering logic
 - [x] use tkinter to interact with the questions
 - [x] use `generators` to create questions from the possible choices
-
+- [ ] add question type: (MultipleChoiceTextToImage) "Which of these molecules contains this functional group?"
+- [ ] add question type: (MultipleChoiceTextToImage) "What is the structure of this inhibitor?"
+- [ ] add information about the molecules once the question is answered
+  - maybe make the image / text a button itself that can be pressed to bring up more information?
+- [ ] clear the co-crystal solute (?whats that called?) from the molecule names so that it isn't as obvious which one is which
+  - [ ] I think you can do this by only downloading the parent molecule (?) i should probably be doing that anyway
 
 # Design Ideas
 - import from Drug Bank, etc
@@ -42,3 +47,8 @@ The most difficult version would be to have the Mastering chemistry-esque "draw 
   - pubchem
 - save question + possible answers + chosen answer + correct answer into i.e. a CSV
 - add GUI molecule drawing interface from, i.e. https://github.com/nicemicro/nicemolecules/tree/main
+- add Options windows for the quizzes
+- make a version of the quiz focused not on the quiz type but rather the dataset, i.e. with questions like:
+  - which kinase does this kinase inhibitor target?
+  - what is the molecular structure of imatinib?
+  - which functional groups do these EGFR inhibitors have in common?

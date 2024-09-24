@@ -26,3 +26,5 @@
   chembl_molecule_id: CHEMBL273453
 - name: estrogen
   chembl_molecule_id: CHEMBL592868
+- name: coumarin
+  chembl_molecule_id: CHEMBL6466
