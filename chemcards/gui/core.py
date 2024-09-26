@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from enum import StrEnum
 
-
 class FontWeight(StrEnum):
     normal = "normal"
     bold = "bold"
@@ -17,12 +16,10 @@ class TKFontStyle(BaseModel):
     def __call__(self) -> tuple:
         return self.font, self.size, self.weight
 
-
 class FontDefaults:
     title = TKFontStyle(font="MS Serif", size=48, weight=FontWeight.bold)
     subtitle = TKFontStyle(font="MS Serif", size=36, weight=FontWeight.bold)
     text = TKFontStyle(font="Helvetica", size=18, weight=FontWeight.bold)
-
 
 class PaddingAndSize:
     window_height = 1200

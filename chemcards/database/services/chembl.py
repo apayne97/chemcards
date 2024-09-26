@@ -86,6 +86,13 @@ class ChemblMoleculeEntry(MoleculeEntry):
             # print(f"Unable to extract a Molecule Object from Chembl entry: {entry}")
             return
 
+CHEMBL_URL = "https://www.ebi.ac.uk/chembl/compound_report_card/"
+def open_chembl_molecule_link(molecule: ChemblMoleculeEntry):
+    import webbrowser
+
+    url = CHEMBL_URL + molecule.molecule_chembl_id
+    return webbrowser.open_new_tab(url)
+
 
 class ChemblMechanismEntry(BaseModel):
     molecule_chembl_id: str
@@ -109,6 +116,9 @@ class ChemblMechanismEntry(BaseModel):
     def from_download(cls, entry) -> "ChemblMechanismEntry":
 
         try:
+            parent = entry.get('parent_molecule_chembl_id', None)
+            if parent is not None:
+                entry['molecule_chembl_id'] = parent
             return cls(**entry)
 
         except Exception as e:
@@ -129,6 +139,10 @@ class ChemblDB(MoleculeDB):
         converted_molecules = [mol for mol in converted_molecules if mol is not None]
 
         return cls(molecules=converted_molecules)
+
+    def remove_duplicates(self):
+        mol_dict = {mol.name: mol for mol in self.molecules}
+        self.molecules = list(mol_dict.values())
 
     @classmethod
     def from_mechanism(cls) -> "ChemblDB":
@@ -179,6 +193,7 @@ def main():
 
     # mydb = ChemblDB.from_download()
     mydb = ChemblDB.from_mechanism()
+    mydb.remove_duplicates()
     mydb.save()
 
 

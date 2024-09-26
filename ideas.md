@@ -34,12 +34,17 @@ The most difficult version would be to have the Mastering chemistry-esque "draw 
 - [x] construct a generator using some filtering logic
 - [x] use tkinter to interact with the questions
 - [x] use `generators` to create questions from the possible choices
-- [ ] add question type: (MultipleChoiceTextToImage) "Which of these molecules contains this functional group?"
-- [ ] add question type: (MultipleChoiceTextToImage) "What is the structure of this inhibitor?"
-- [ ] add information about the molecules once the question is answered
+- [x] add question type: (MultipleChoiceTextToImage) "What is the structure of this inhibitor?"
+- [x] add information about the molecules once the question is answered
   - maybe make the image / text a button itself that can be pressed to bring up more information?
+- [x] add a Molecule Info window
+- [ ] make it possible to look up the molecules that aren't the answer as well
+- [ ] add question type: (MultipleChoiceTextToImage) "Which of these molecules contains this functional group?"
 - [ ] clear the co-crystal solute (?whats that called?) from the molecule names so that it isn't as obvious which one is which
   - [ ] I think you can do this by only downloading the parent molecule (?) i should probably be doing that anyway
+- [ ] make download faster 
+  - [ ] parallelize
+  - [ ] make it interruptible (save intermediate states)
 
 # Design Ideas
 - import from Drug Bank, etc

@@ -3,11 +3,11 @@ import tkinter as tk
 import ttkbootstrap as tb
 
 from chemcards.gui.core import PaddingAndSize, FontDefaults
-from chemcards.gui.quizwindow import QuizBase, MultipleChoiceMoleculeToTargetQuiz, MultipleChoiceMoleculeToNameQuiz
+from chemcards.gui.quizwindow import QuizBase, MultipleChoiceMoleculeToTargetQuiz, MultipleChoiceMoleculeToNameQuiz, MultipleChoiceNameToMoleculeQuiz
 from functools import partial
 # QUIZZES = [MultipleChoiceMoleculeToTargetQuiz, MultipleChoiceMoleculeToNameQuiz]
 
-QUIZZES = {quiz.name: quiz for quiz in [MultipleChoiceMoleculeToTargetQuiz, MultipleChoiceMoleculeToNameQuiz]}
+QUIZZES = {quiz.name: quiz for quiz in [MultipleChoiceMoleculeToTargetQuiz, MultipleChoiceMoleculeToNameQuiz, MultipleChoiceNameToMoleculeQuiz]}
 
 
 class MainWindow:

@@ -12,6 +12,8 @@ class MoleculeEntry(BaseModel):
     indication: str = Field("unknown")
     mechanism_of_action: str = Field("unknown")
     action_type: str = Field("unknown")
+    molecule_chembl_id: str = Field("unknown")
+    target_chembl_id: str = Field("unknown")
 
     def to_rdkit(self) -> Mol:
         return MolFromSmiles(self.smiles)
