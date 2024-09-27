@@ -38,6 +38,7 @@ The most difficult version would be to have the Mastering chemistry-esque "draw 
 - [x] add information about the molecules once the question is answered
   - maybe make the image / text a button itself that can be pressed to bring up more information?
 - [x] add a Molecule Info window
+- [ ] add instructions on how to download / use
 - [ ] make it possible to look up the molecules that aren't the answer as well
 - [ ] add question type: (MultipleChoiceTextToImage) "Which of these molecules contains this functional group?"
 - [ ] clear the co-crystal solute (?whats that called?) from the molecule names so that it isn't as obvious which one is which
