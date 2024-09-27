@@ -20,7 +20,7 @@ class MoleculeViz:
     def img_path(self) -> Path:
         return TEMP_DIR / f"{self.molecule.name}.png"
 
-    def get_image(self) -> Path:
+    def get_image(self, height=400, width=400) -> ImageTk.PhotoImage:
 
         # if not self.img_path.exists():
         self.img_path.parent.mkdir(exist_ok=True)
@@ -29,7 +29,7 @@ class MoleculeViz:
         img.save(self.img_path)
 
         img = Image.open(self.img_path)
-        img = img.resize((400, 400))
+        img = img.resize((height, width))
         img = ImageTk.PhotoImage(img)
 
         return img
@@ -61,13 +61,17 @@ class MoleculeWindow:
         image_label.image = img
         image_label.configure(image=img)
 
+        # Try to accommodate the width of the text without it being too long
+        width = max([len(value) for value in molecule.model_dump().values()]) + 2
+        width = min(width, 100)
+
         # Add Text
         i = 0
         for key, value in molecule.model_dump().items():
             if isinstance(value, str):
                 label = tb.Label(self.text_frame, text=key, bootstyle="info")
                 label.grid(row=i, column=0)
-                text = tb.Entry(self.text_frame, width=len(value))
+                text = tb.Entry(self.text_frame, width=width)
                 text.insert(0, value)
                 text.grid(row=i, column=1)
 

@@ -4,9 +4,12 @@ from abc import abstractmethod
 import ttkbootstrap as tb
 
 from chemcards.database.core import MoleculeDB
-from chemcards.flashcards.core import FlashCardGeneratorBase
+from chemcards.flashcards.core import (
+    FlashCardGeneratorBase,
+)
 from chemcards.flashcards.filters import MissingTargetFilter
 from chemcards.flashcards.multiplechoice import (
+    MultipleChoiceGeneratorBase,
     MultipleChoiceMoleculeToTargetGenerator,
     MultipleChoiceMoleculeToNameGenerator,
     MultipleChoiceNameToMoleculeGenerator,
@@ -15,7 +18,7 @@ from chemcards.gui.core import PaddingAndSize, FontDefaults
 from chemcards.gui.molecules import MoleculeViz, MoleculeWindow
 
 
-class QuizBase:
+class MultipleChoiceQuizBase:
     name = "Quiz Base"
 
     def __init__(self, main_window: "MainWindow"):
@@ -37,7 +40,9 @@ class QuizBase:
 
         self.molecule_database: MoleculeDB = MoleculeDB.load()
 
-        self.question_generator: FlashCardGeneratorBase = self.get_question_generator()
+        self.question_generator: MultipleChoiceGeneratorBase = (
+            self.get_question_generator()
+        )
 
         self.make_frames()
 
@@ -46,7 +51,7 @@ class QuizBase:
         pass
 
     @abstractmethod
-    def get_question_generator(self) -> FlashCardGeneratorBase:
+    def get_question_generator(self) -> MultipleChoiceGeneratorBase:
         pass
 
     def add_check_answer_button(self):
@@ -57,6 +62,18 @@ class QuizBase:
             command=self.check_answer,
         )
         check_answer_button.grid(row=1, column=0, padx=PaddingAndSize.between)
+
+    def check_answer(self):
+        option_selected = self.option_selected.get()
+        self.option_buttons[option_selected].configure(
+            bootstyle="danger.Outline.Toolbutton"
+        )
+        self.option_buttons[self.current_question.answer_index].configure(
+            bootstyle="success.Outline.Toolbutton"
+        )
+        self.total_number_of_questions += 1
+        if option_selected == self.current_question.answer:
+            self.correct += 1
 
     def add_next_button(self):
         next_button = tb.Button(
@@ -75,8 +92,7 @@ class QuizBase:
         end_button.grid(row=1, column=2, padx=PaddingAndSize.between)
 
     def make_molecule_window(self):
-        current_molecule = self.current_question.choices[self.current_question.answer]
-        MoleculeWindow(current_molecule, self.gui)
+        MoleculeWindow(self.current_question.answer_molecule, self.gui)
 
     def add_molecule_info_button(self):
         molecule_info_button = tb.Button(
@@ -85,10 +101,6 @@ class QuizBase:
             command=self.make_molecule_window,
         )
         molecule_info_button.grid(row=1, column=3, padx=PaddingAndSize.between)
-
-    @abstractmethod
-    def check_answer(self):
-        pass
 
     @abstractmethod
     def display_question(self):
@@ -134,7 +146,7 @@ class QuizBase:
         back_to_main_menu.pack()
 
 
-class MultipleChoiceTextToImageQuizBase(QuizBase):
+class MultipleChoiceTextToImageQuizBase(MultipleChoiceQuizBase):
     name = "Multiple Choice (Text to Image) Quiz Base"
 
     def make_frames(self):
@@ -196,17 +208,12 @@ class MultipleChoiceTextToImageQuizBase(QuizBase):
         # setting the Question properties
         self.question_label.configure(text=self.current_question.question)
 
-        if self.current_question.display:
-
-            mviz = MoleculeViz(self.current_question.display)
-            img = mviz.get_image()
-            self.display_panel.image = img
-            self.display_panel.configure(image=img)
-
         self.option_selected.set(0)
         for i, choice in enumerate(self.current_question.choices):
             mviz = MoleculeViz(choice)
-            img = mviz.get_image()
+            img = mviz.get_image(250, 250)
+
+            # I don't understand why but both of these lines are neccessary
             self.option_buttons[i].image = img
             self.option_buttons[i].configure(
                 # text=choice,
@@ -214,20 +221,8 @@ class MultipleChoiceTextToImageQuizBase(QuizBase):
                 image=img,
             )
 
-    def check_answer(self):
-        option_selected = self.option_selected.get()
-        self.option_buttons[option_selected].configure(
-            bootstyle="danger.Outline.Toolbutton"
-        )
-        self.option_buttons[self.current_question.answer].configure(
-            bootstyle="success.Outline.Toolbutton"
-        )
-        self.total_number_of_questions += 1
-        if option_selected == self.current_question.answer:
-            self.correct += 1
 
-
-class MultipleChoiceImageToTextQuizBase(QuizBase):
+class MultipleChoiceImageToTextQuizBase(MultipleChoiceQuizBase):
     name = "Multiple Choice (Image to Text) Quiz Base"
 
     def make_frames(self):
@@ -297,8 +292,9 @@ class MultipleChoiceImageToTextQuizBase(QuizBase):
 
         if self.current_question.display:
 
-            mviz = MoleculeViz(self.current_question.display)
-            img = mviz.get_image()
+            img = MoleculeViz(self.current_question.display).get_image()
+
+            # I don't understand why but both of these lines are neccessary
             self.display_panel.image = img
             self.display_panel.configure(image=img)
 
@@ -307,18 +303,6 @@ class MultipleChoiceImageToTextQuizBase(QuizBase):
             self.option_buttons[i].configure(
                 text=choice, bootstyle="info.Outline.Toolbutton"
             )
-
-    def check_answer(self):
-        option_selected = self.option_selected.get()
-        self.option_buttons[option_selected].configure(
-            bootstyle="danger.Outline.Toolbutton"
-        )
-        self.option_buttons[self.current_question.answer].configure(
-            bootstyle="success.Outline.Toolbutton"
-        )
-        self.total_number_of_questions += 1
-        if option_selected == self.current_question.answer:
-            self.correct += 1
 
 
 class MultipleChoiceMoleculeToTargetQuiz(MultipleChoiceImageToTextQuizBase):
