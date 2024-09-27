@@ -47,17 +47,18 @@ class MultipleChoiceMoleculeToNameGenerator(FlashCardGeneratorBase):
             display=example_molecules[correct],
             choices=[mol.name for mol in example_molecules],
             answer=correct,
-    )
+        )
+
 
 class MultipleChoiceNameToMoleculeGenerator(FlashCardGeneratorBase):
 
     name = "Multiple Choice - Name to Molecule"
-    
+
     def next(self) -> MultipleChoice:
         example_molecules = random.sample(self.molecule_db.molecules, 4)
         correct = random.randint(0, 3)
         return MultipleChoice(
             question=f"Which of these molecules is {example_molecules[correct].name}?",
             choices=[mol for mol in example_molecules],
-            answer=correct
+            answer=correct,
         )

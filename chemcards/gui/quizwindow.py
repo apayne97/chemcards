@@ -6,7 +6,11 @@ import ttkbootstrap as tb
 from chemcards.database.core import MoleculeDB
 from chemcards.flashcards.core import FlashCardGeneratorBase
 from chemcards.flashcards.filters import MissingTargetFilter
-from chemcards.flashcards.multiplechoice import MultipleChoiceMoleculeToTargetGenerator, MultipleChoiceMoleculeToNameGenerator, MultipleChoiceNameToMoleculeGenerator
+from chemcards.flashcards.multiplechoice import (
+    MultipleChoiceMoleculeToTargetGenerator,
+    MultipleChoiceMoleculeToNameGenerator,
+    MultipleChoiceNameToMoleculeGenerator,
+)
 from chemcards.gui.core import PaddingAndSize, FontDefaults
 from chemcards.gui.molecules import MoleculeViz, MoleculeWindow
 
@@ -30,6 +34,11 @@ class QuizBase:
         self.frame.pack(
             padx=PaddingAndSize.frame_padding / 2, pady=PaddingAndSize.frame_padding / 2
         )
+
+        self.molecule_database: MoleculeDB = MoleculeDB.load()
+
+        self.question_generator: FlashCardGeneratorBase = self.get_question_generator()
+
         self.make_frames()
 
     @abstractmethod
@@ -37,24 +46,48 @@ class QuizBase:
         pass
 
     @abstractmethod
-    def load_molecule_database(self):
-        self.question_generator: FlashCardGeneratorBase
+    def get_question_generator(self) -> FlashCardGeneratorBase:
         pass
 
-    @abstractmethod
     def add_check_answer_button(self):
-        pass
+        # Check Answer
+        check_answer_button = tb.Button(
+            self.control_frame,
+            text="Check My Answer",
+            command=self.check_answer,
+        )
+        check_answer_button.grid(row=1, column=0, padx=PaddingAndSize.between)
+
+    def add_next_button(self):
+        next_button = tb.Button(
+            self.control_frame,
+            text="Next",
+            command=self.next_question,
+        )
+        next_button.grid(row=1, column=1, padx=PaddingAndSize.between)
+
+    def add_end_button(self):
+        end_button = tb.Button(
+            self.control_frame,
+            text="Finish Quiz",
+            command=self.end,
+        )
+        end_button.grid(row=1, column=2, padx=PaddingAndSize.between)
+
+    def make_molecule_window(self):
+        current_molecule = self.current_question.choices[self.current_question.answer]
+        MoleculeWindow(current_molecule, self.gui)
+
+    def add_molecule_info_button(self):
+        molecule_info_button = tb.Button(
+            self.control_frame,
+            text="View Molecule Info",
+            command=self.make_molecule_window,
+        )
+        molecule_info_button.grid(row=1, column=3, padx=PaddingAndSize.between)
 
     @abstractmethod
     def check_answer(self):
-        pass
-
-    @abstractmethod
-    def add_next_button(self):
-        pass
-
-    @abstractmethod
-    def add_end_button(self):
         pass
 
     @abstractmethod
@@ -63,10 +96,6 @@ class QuizBase:
 
     @abstractmethod
     def _make_buttons(self):
-        pass
-
-    @abstractmethod
-    def add_molecule_info_button(self):
         pass
 
     def make_buttons(self):
@@ -85,7 +114,6 @@ class QuizBase:
             widget.destroy()
 
     def start(self):
-        self.load_molecule_database()
         self.make_buttons()
         self.next_question()
 
@@ -105,6 +133,7 @@ class QuizBase:
         )
         back_to_main_menu.pack()
 
+
 class MultipleChoiceTextToImageQuizBase(QuizBase):
     name = "Multiple Choice (Text to Image) Quiz Base"
 
@@ -121,41 +150,6 @@ class MultipleChoiceTextToImageQuizBase(QuizBase):
 
         self.control_frame = tb.Frame(self.frame)
         self.control_frame.grid(row=3, pady=PaddingAndSize.between)
-
-    def add_check_answer_button(self):
-        # Check Answer
-        check_answer_button = tb.Button(
-            self.control_frame, text="Check My Answer", command=self.check_answer,
-        )
-        check_answer_button.grid(row=1,column=0, padx=PaddingAndSize.between)
-
-    def add_next_button(self):
-        next_button = tb.Button(
-            self.control_frame,
-            text="Next",
-            command=self.next_question,
-        )
-        next_button.grid(row=1,column=1, padx=PaddingAndSize.between)
-
-    def add_end_button(self):
-        end_button = tb.Button(
-            self.control_frame,
-            text="Finish Quiz",
-            command=self.end,
-        )
-        end_button.grid(row=1, column=2, padx=PaddingAndSize.between)
-    
-    def make_molecule_window(self):
-        current_molecule = self.current_question.choices[self.current_question.answer]
-        MoleculeWindow(current_molecule, self.gui)
-
-    def add_molecule_info_button(self):
-        molecule_info_button = tb.Button(
-            self.control_frame,
-            text="View Molecule Info",
-            command=self.make_molecule_window
-        )
-        molecule_info_button.grid(row=1, column=3, padx=PaddingAndSize.between)
 
     def _make_buttons(self):
         # Title
@@ -192,7 +186,7 @@ class MultipleChoiceTextToImageQuizBase(QuizBase):
             button_list.append(radio_btn)
 
             # placing the button
-            radio_btn.grid(row=0,column=i, padx=PaddingAndSize.between)
+            radio_btn.grid(row=0, column=i, padx=PaddingAndSize.between)
 
         # return the radio buttons
         self.option_buttons = button_list
@@ -215,9 +209,9 @@ class MultipleChoiceTextToImageQuizBase(QuizBase):
             img = mviz.get_image()
             self.option_buttons[i].image = img
             self.option_buttons[i].configure(
-                # text=choice, 
+                # text=choice,
                 bootstyle="info.Outline.Toolbutton",
-                image = img
+                image=img,
             )
 
     def check_answer(self):
@@ -233,46 +227,26 @@ class MultipleChoiceTextToImageQuizBase(QuizBase):
             self.correct += 1
 
 
-
 class MultipleChoiceImageToTextQuizBase(QuizBase):
     name = "Multiple Choice (Image to Text) Quiz Base"
 
     def make_frames(self):
         self.title_frame = tb.Frame(self.frame)
-        self.title_frame.pack(side="top", pady=PaddingAndSize.between)
+        self.title_frame.grid(row=0, pady=PaddingAndSize.between)
 
         self.question_frame = tb.Frame(self.frame)
-        self.question_frame.pack(
-            side="left", padx=PaddingAndSize.between, pady=PaddingAndSize.between
+
+        self.question_frame.grid(
+            row=1, column=0, pady=PaddingAndSize.between, padx=PaddingAndSize.between
         )
 
         self.display_frame = tb.Frame(self.frame)
-        self.display_frame.pack(
-            side="right", pady=PaddingAndSize.between, padx=PaddingAndSize.between
+        self.display_frame.grid(
+            row=1, column=1, pady=PaddingAndSize.between, padx=PaddingAndSize.between
         )
 
-    def add_check_answer_button(self):
-        # Check Answer
-        check_answer_button = tb.Button(
-            self.display_frame, text="Check My Answer", command=self.check_answer
-        )
-        check_answer_button.pack(pady=PaddingAndSize.between)
-
-    def add_next_button(self):
-        next_button = tb.Button(
-            self.display_frame,
-            text="Next",
-            command=self.next_question,
-        )
-        next_button.pack(pady=PaddingAndSize.between)
-
-    def add_end_button(self):
-        end_button = tb.Button(
-            self.display_frame,
-            text="Finish Quiz",
-            command=self.end,
-        )
-        end_button.pack(pady=PaddingAndSize.between)
+        self.control_frame = tb.Frame(self.frame)
+        self.control_frame.grid(row=2, columnspan=2, pady=PaddingAndSize.between)
 
     def _make_buttons(self):
         # Title
@@ -350,21 +324,19 @@ class MultipleChoiceImageToTextQuizBase(QuizBase):
 class MultipleChoiceMoleculeToTargetQuiz(MultipleChoiceImageToTextQuizBase):
     name = MultipleChoiceMoleculeToTargetGenerator.name
 
-    def load_molecule_database(self):
-        self.molecule_db = MoleculeDB.load()
-        self.question_generator = MultipleChoiceMoleculeToTargetGenerator(self.molecule_db)
+    def get_question_generator(self) -> FlashCardGeneratorBase:
+        return MultipleChoiceMoleculeToTargetGenerator(self.molecule_database)
 
 
 class MultipleChoiceMoleculeToNameQuiz(MultipleChoiceImageToTextQuizBase):
     name = MultipleChoiceMoleculeToNameGenerator.name
 
-    def load_molecule_database(self):
-        self.molecule_db = MoleculeDB.load()
-        self.question_generator = MultipleChoiceMoleculeToNameGenerator(self.molecule_db)
+    def get_question_generator(self) -> FlashCardGeneratorBase:
+        return MultipleChoiceMoleculeToNameGenerator(self.molecule_database)
+
 
 class MultipleChoiceNameToMoleculeQuiz(MultipleChoiceTextToImageQuizBase):
     name = MultipleChoiceNameToMoleculeGenerator.name
 
-    def load_molecule_database(self):
-        self.molecule_db = MoleculeDB.load()
-        self.question_generator = MultipleChoiceNameToMoleculeGenerator(self.molecule_db)
+    def get_question_generator(self) -> FlashCardGeneratorBase:
+        return MultipleChoiceNameToMoleculeGenerator(self.molecule_database)

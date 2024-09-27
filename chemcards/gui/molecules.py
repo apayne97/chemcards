@@ -11,7 +11,8 @@ import tkinter as tk
 from functools import partial
 import ttkbootstrap as tb
 
-class MoleculeViz():
+
+class MoleculeViz:
     def __init__(self, molecule: MoleculeEntry):
         self.molecule = molecule
 
@@ -20,34 +21,36 @@ class MoleculeViz():
         return TEMP_DIR / f"{self.molecule.name}.png"
 
     def get_image(self) -> Path:
-        
+
         # if not self.img_path.exists():
         self.img_path.parent.mkdir(exist_ok=True)
         mol = self.molecule.to_rdkit()
-        img = Draw.MolToImage(mol, size=(800,800))
+        img = Draw.MolToImage(mol, size=(800, 800))
         img.save(self.img_path)
 
         img = Image.open(self.img_path)
-        img = img.resize((250, 250))
+        img = img.resize((400, 400))
         img = ImageTk.PhotoImage(img)
-        
+
         return img
-            
+
 
 class MoleculeWindow:
 
-    def __init__(self,  molecule: MoleculeEntry, gui: tb.Window = None):
+    def __init__(self, molecule: MoleculeEntry, gui: tb.Window = None):
         if gui is None:
             self.gui = tb.Window(themename="superhero")
         else:
             self.gui = tb.Toplevel(gui)
         self.gui.title(molecule.name)
-        
+
         self.image_frame = tb.Frame(self.gui)
         self.image_frame.grid(row=0, pady=PaddingAndSize.edge, padx=PaddingAndSize.edge)
-        
+
         self.text_frame = tb.Frame(self.gui)
-        self.text_frame.grid(row=1, column=0, pady=PaddingAndSize.between, padx=PaddingAndSize.edge)
+        self.text_frame.grid(
+            row=1, column=0, pady=PaddingAndSize.between, padx=PaddingAndSize.edge
+        )
 
         # Add Mol Image
         mviz = MoleculeViz(molecule=molecule)
@@ -65,20 +68,19 @@ class MoleculeWindow:
                 label = tb.Label(self.text_frame, text=key, bootstyle="info")
                 label.grid(row=i, column=0)
                 text = tb.Entry(self.text_frame, width=len(value))
-                text.insert(0,value)
+                text.insert(0, value)
                 text.grid(row=i, column=1)
 
                 i += 1
-        
+
         # Add Chembl Link
         partial_func = partial(open_chembl_molecule_link, molecule)
-        chembl_button = tb.Button(self.text_frame, 
-                                  text="Open Chembl Molecule Link",
-                                  bootstyle="info",
-                                  command=partial_func)
+        chembl_button = tb.Button(
+            self.text_frame,
+            text="Open Chembl Molecule Link",
+            bootstyle="info",
+            command=partial_func,
+        )
         chembl_button.grid(row=i, column=1)
-
-
-
 
         self.gui.mainloop()
