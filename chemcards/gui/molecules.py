@@ -1,5 +1,6 @@
 from chemcards.database.resources import TEMP_DIR
 from chemcards.database.core import MoleculeEntry
+from chemcards.database.cheminformatics import FunctionalGroup, AnnotatedMoleculeEntry
 from chemcards.gui.core import PaddingAndSize
 from chemcards.database.services.chembl import open_chembl_molecule_link
 from pydantic import BaseModel
@@ -11,6 +12,10 @@ import tkinter as tk
 from functools import partial
 import ttkbootstrap as tb
 
+HIGHLIGHT_COLORS = [
+    (r / 256, g / 256, b / 256) for r, g, b in [(68, 178, 212), (39, 136, 169)]
+]
+
 
 class MoleculeViz:
     def __init__(self, molecule: MoleculeEntry):
@@ -20,19 +25,56 @@ class MoleculeViz:
     def img_path(self) -> Path:
         return TEMP_DIR / f"{self.molecule.name}.png"
 
-    def get_image(self, height=400, width=400) -> ImageTk.PhotoImage:
+    def get_image(
+        self,
+        height=400,
+        width=400,
+        highlight_functional_groups=False,
+        highlight_functional_group: FunctionalGroup = None,
+        use_tkinter=True,
+    ) -> ImageTk.PhotoImage:
 
         # if not self.img_path.exists():
         self.img_path.parent.mkdir(exist_ok=True)
         mol = self.molecule.to_rdkit()
-        img = Draw.MolToImage(mol, size=(800, 800))
-        img.save(self.img_path)
+
+        if highlight_functional_groups:
+            raise NotImplementedError
+
+        if highlight_functional_group:
+            if highlight_functional_group.match(self.molecule):
+                # Set Draw Options
+                dopts = Draw.rdMolDraw2D.MolDrawOptions()
+                dopts.setHighlightColour(HIGHLIGHT_COLORS[0])
+                dopts.highlightBondWidthMultiplier = 16
+
+                # Find the atoms to highlight
+                highlight = [
+                    mol.GetSubstructMatch(highlight_functional_group.to_rdkit())
+                ]
+
+                # Draw the molecules
+                img = Draw.MolsToGridImage(
+                    [mol],
+                    subImgSize=(800, 800),
+                    molsPerRow=1,
+                    highlightAtomLists=highlight,
+                    drawOptions=dopts,
+                )
+                with open(self.img_path, "wb") as f:
+                    f.write(img.data)
+        else:
+            img = Draw.MolToImage(mol, size=(800, 800))
+            img.save(self.img_path)
 
         img = Image.open(self.img_path)
         img = img.resize((height, width))
-        img = ImageTk.PhotoImage(img)
 
-        return img
+        if not use_tkinter:
+            return img
+        else:
+            img = ImageTk.PhotoImage(img)
+            return img
 
 
 class MoleculeWindow:

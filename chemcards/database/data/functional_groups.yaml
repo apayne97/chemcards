@@ -41,7 +41,9 @@
   smarts: "[#1,#6][CX3](=[NX2][#1,#6&!$([CX3]=[OX1,SX1,NX2])])[#1,#6]"
 - name: acid anhydride
   smarts: "[CX3](=[OX1])[OX2][CX3](=[OX1])"
-- name: beta-keto/anhydride
+- name: beta-keto anhydride
   smarts: "[C,c](=O)[CX4,CR0X3,O][C,c](=O)"
 - name: beta-lactam
   smarts: "[NX3]1[CX4][CX4][CX3]1(=[OX1])"
+- name: morpholine
+  smarts: "O1CC[NH1]CC1"
