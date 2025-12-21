@@ -1,0 +1,15 @@
+name: chemcards
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pip
+  - pydantic
+  - rdkit
+  - pillow
+  - tqdm
+  - requests
+  - numpy
+  - idna
+  - easydict
+prefix: /Users/alexpayne/miniconda3/envs/chemcards
