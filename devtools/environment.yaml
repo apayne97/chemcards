@@ -12,4 +12,6 @@ dependencies:
   - numpy
   - idna
   - easydict
+  - yaml
+  - pyyaml
 prefix: /Users/alexpayne/miniconda3/envs/chemcards
