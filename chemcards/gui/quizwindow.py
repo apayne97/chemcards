@@ -14,7 +14,7 @@ from chemcards.flashcards.multiplechoice import (
     MultipleChoiceMoleculeToNameGenerator,
     MultipleChoiceNameToMoleculeGenerator,
 )
-from chemcards.gui.core import PaddingAndSize, FontDefaults
+from chemcards.gui.core import WindowOptions, FontDefaults
 from chemcards.gui.molecules import MoleculeViz, MoleculeWindow
 
 
@@ -27,15 +27,16 @@ class MultipleChoiceQuizBase:
         self.total_number_of_questions = 0
         self.main_window = main_window
         self.gui = main_window.gui
+        self.window_options = WindowOptions()
 
         self.frame = tb.Frame(
             self.gui,
-            height=PaddingAndSize.frame_height,
-            width=PaddingAndSize.frame_width,
+            height=self.window_options.frame_height,
+            width=self.window_options.frame_width,
             bootstyle="dark",
         )
         self.frame.pack(
-            padx=PaddingAndSize.frame_padding / 2, pady=PaddingAndSize.frame_padding / 2
+            padx=self.window_options.frame_padding / 2, pady=self.window_options.frame_padding / 2
         )
 
         self.molecule_database: MoleculeDB = MoleculeDB.load()
@@ -61,7 +62,7 @@ class MultipleChoiceQuizBase:
             text="Check My Answer",
             command=self.check_answer,
         )
-        check_answer_button.grid(row=1, column=0, padx=PaddingAndSize.between)
+        check_answer_button.grid(row=1, column=0, padx=self.window_options.between)
 
     def check_answer(self):
         option_selected = self.option_selected.get()
@@ -81,7 +82,7 @@ class MultipleChoiceQuizBase:
             text="Next",
             command=self.next_question,
         )
-        next_button.grid(row=1, column=1, padx=PaddingAndSize.between)
+        next_button.grid(row=1, column=1, padx=self.window_options.between)
 
     def add_end_button(self):
         end_button = tb.Button(
@@ -89,7 +90,7 @@ class MultipleChoiceQuizBase:
             text="Finish Quiz",
             command=self.end,
         )
-        end_button.grid(row=1, column=2, padx=PaddingAndSize.between)
+        end_button.grid(row=1, column=2, padx=self.window_options.between)
 
     def make_molecule_window(self):
         MoleculeWindow(self.current_question.answer_molecule, self.gui)
@@ -100,7 +101,7 @@ class MultipleChoiceQuizBase:
             text="View Molecule Info",
             command=self.make_molecule_window,
         )
-        molecule_info_button.grid(row=1, column=3, padx=PaddingAndSize.between)
+        molecule_info_button.grid(row=1, column=3, padx=self.window_options.between)
 
     @abstractmethod
     def display_question(self):
@@ -151,17 +152,17 @@ class MultipleChoiceTextToImageQuizBase(MultipleChoiceQuizBase):
 
     def make_frames(self):
         self.title_frame = tb.Frame(self.frame)
-        self.title_frame.grid(row=0, pady=PaddingAndSize.between)
+        self.title_frame.grid(row=0, pady=self.window_options.between)
 
         self.question_frame = tb.Frame(self.frame)
-        self.question_frame.grid(row=1, pady=PaddingAndSize.between)
+        self.question_frame.grid(row=1, pady=self.window_options.between)
 
         self.display_frame = tb.Frame(self.frame)
-        self.display_frame.grid(row=2, pady=PaddingAndSize.between)
+        self.display_frame.grid(row=2, pady=self.window_options.between)
         # self.display_frame.grid(row=2, column=0, columnspan=4)
 
         self.control_frame = tb.Frame(self.frame)
-        self.control_frame.grid(row=3, pady=PaddingAndSize.between)
+        self.control_frame.grid(row=3, pady=self.window_options.between)
 
     def _make_buttons(self):
         # Title
@@ -198,7 +199,7 @@ class MultipleChoiceTextToImageQuizBase(MultipleChoiceQuizBase):
             button_list.append(radio_btn)
 
             # placing the button
-            radio_btn.grid(row=0, column=i, padx=PaddingAndSize.between)
+            radio_btn.grid(row=0, column=i, padx=self.window_options.between)
 
         # return the radio buttons
         self.option_buttons = button_list
@@ -227,21 +228,21 @@ class MultipleChoiceImageToTextQuizBase(MultipleChoiceQuizBase):
 
     def make_frames(self):
         self.title_frame = tb.Frame(self.frame)
-        self.title_frame.grid(row=0, pady=PaddingAndSize.between)
+        self.title_frame.grid(row=0, pady=self.window_options.between)
 
         self.question_frame = tb.Frame(self.frame)
 
         self.question_frame.grid(
-            row=1, column=0, pady=PaddingAndSize.between, padx=PaddingAndSize.between
+            row=1, column=0, pady=self.window_options.between, padx=self.window_options.between
         )
 
         self.display_frame = tb.Frame(self.frame)
         self.display_frame.grid(
-            row=1, column=1, pady=PaddingAndSize.between, padx=PaddingAndSize.between
+            row=1, column=1, pady=self.window_options.between, padx=self.window_options.between
         )
 
         self.control_frame = tb.Frame(self.frame)
-        self.control_frame.grid(row=2, columnspan=2, pady=PaddingAndSize.between)
+        self.control_frame.grid(row=2, columnspan=2, pady=self.window_options.between)
 
     def _make_buttons(self):
         # Title
@@ -280,7 +281,7 @@ class MultipleChoiceImageToTextQuizBase(MultipleChoiceQuizBase):
             button_list.append(radio_btn)
 
             # placing the button
-            radio_btn.pack(pady=PaddingAndSize.between)
+            radio_btn.pack(pady=self.window_options.between)
 
         # return the radio buttons
         self.option_buttons = button_list

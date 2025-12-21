@@ -1,7 +1,7 @@
 from chemcards.database.resources import TEMP_DIR
 from chemcards.database.core import MoleculeEntry
 from chemcards.database.cheminformatics import FunctionalGroup, AnnotatedMoleculeEntry
-from chemcards.gui.core import PaddingAndSize
+from chemcards.gui.core import WindowOptions
 from chemcards.database.services.chembl import open_chembl_molecule_link
 from pydantic import BaseModel
 from pathlib import Path
@@ -87,11 +87,11 @@ class MoleculeWindow:
         self.gui.title(molecule.name)
 
         self.image_frame = tb.Frame(self.gui)
-        self.image_frame.grid(row=0, pady=PaddingAndSize.edge, padx=PaddingAndSize.edge)
+        self.image_frame.grid(row=0, pady=WindowOptions.edge, padx=WindowOptions.edge)
 
         self.text_frame = tb.Frame(self.gui)
         self.text_frame.grid(
-            row=1, column=0, pady=PaddingAndSize.between, padx=PaddingAndSize.edge
+            row=1, column=0, pady=WindowOptions.between, padx=WindowOptions.edge
         )
 
         # Add Mol Image

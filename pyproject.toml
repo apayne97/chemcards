@@ -25,7 +25,7 @@ dependencies = ["rdkit", "pydantic", "chembl_webresource_client", "tqdm"]
 "Bug Tracker" = "https://github.com/apayne97/issues"
 
 [project.scripts]
-chemcards = "chemcards.chemcards:main"
+chemcards = "chemcards.cli:cli"
 download_chembl = 'chemcards.database.services.chembl:main'
 
 [tool.setuptools.packages.find]

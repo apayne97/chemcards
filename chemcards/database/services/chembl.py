@@ -61,30 +61,29 @@ class ChemblMoleculeEntry(MoleculeEntry):
     target_chembl_id: str
 
     @classmethod
-    def from_download(cls, entry) -> "ChemblMoleculeEntry":
-        try:
-            name = entry["pref_name"]
-            smiles = entry["molecule_structures"]["canonical_smiles"]
-            target = entry["usan_stem_definition"]
-            indication = entry["indication_class"]
-            molecule_chembl_id = entry["molecule_chembl_id"]
+    def from_download(cls, entry:dict) -> "ChemblMoleculeEntry":
+        name = entry["pref_name"]
+        smiles = entry["molecule_structures"]["canonical_smiles"]
+        target = entry["usan_stem_definition"]
+        # indication = entry["indication_class"]
+        molecule_chembl_id = entry["molecule_chembl_id"]
 
-            if target is None:
-                target = "unknown"
-            if indication is None:
-                indication = "unknown"
-            return cls(
-                name=name,
-                smiles=smiles,
-                target=target,
-                indication=indication,
-                molecule_chembl_id=molecule_chembl_id,
-                target_chembl_id="unknown",
-            )
+        if target is None:
+            target = "unknown"
+        # if indication is None:
+        #     indication = "unknown"
+        return cls(
+            name=name,
+            smiles=smiles,
+            target=target,
+            # indication=indication,
+            molecule_chembl_id=molecule_chembl_id,
+            target_chembl_id="unknown",
+        )
 
-        except Exception as e:
-            # print(f"Unable to extract a Molecule Object from Chembl entry: {entry}")
-            return
+        # except Exception as e:
+        #     # print(f"Unable to extract a Molecule Object from Chembl entry: {entry}")
+        #     return
 
 CHEMBL_URL = "https://www.ebi.ac.uk/chembl/compound_report_card/"
 def open_chembl_molecule_link(molecule: ChemblMoleculeEntry):
@@ -115,15 +114,14 @@ class ChemblMechanismEntry(BaseModel):
     @classmethod
     def from_download(cls, entry) -> "ChemblMechanismEntry":
 
-        try:
-            parent = entry.get('parent_molecule_chembl_id', None)
-            if parent is not None:
-                entry['molecule_chembl_id'] = parent
-            return cls(**entry)
+        parent = entry.get('parent_molecule_chembl_id', None)
+        if parent is not None:
+            entry['molecule_chembl_id'] = parent
+        return cls(**entry)
 
-        except Exception as e:
-            # print(f"Unable to extract a Molecule Object from Chembl entry: {entry}")
-            return
+        # except Exception as e:
+        #     # print(f"Unable to extract a Molecule Object from Chembl entry: {entry}")
+        #     return
 
 
 class ChemblDB(MoleculeDB):
@@ -191,7 +189,7 @@ def main():
     #     print("Downloading Chembl Target Data")
     #     download_drug_targets()
 
-    # mydb = ChemblDB.from_download()
+    mydb = ChemblDB.from_download()
     mydb = ChemblDB.from_mechanism()
     mydb.remove_duplicates()
     mydb.save()

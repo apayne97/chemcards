@@ -2,7 +2,7 @@ import tkinter as tk
 
 import ttkbootstrap as tb
 
-from chemcards.gui.core import PaddingAndSize, FontDefaults
+from chemcards.gui.core import WindowOptions, FontDefaults
 from chemcards.gui.quizwindow import (
     MultipleChoiceQuizBase,
     MultipleChoiceMoleculeToTargetQuiz,
@@ -25,9 +25,10 @@ QUIZZES = {
 
 class MainWindow:
     def __init__(self):
+        self.window_options = WindowOptions()
         self.gui = tb.Window(themename="superhero")
         self.gui.title("ChemCards")
-        self.gui.geometry(PaddingAndSize.window_size)
+        self.gui.geometry(self.window_options.window_size)
         self.quiz_buttons = []
         self.all_buttons = []
 
@@ -54,8 +55,8 @@ class MainWindow:
         self.quit_button.pack(
             side=tk.RIGHT,
             anchor=tk.NE,
-            padx=PaddingAndSize.edge,
-            pady=PaddingAndSize.edge,
+            padx=self.window_options.edge,
+            pady=self.window_options.edge,
         )
 
     def destroy_buttons(self):
@@ -75,7 +76,7 @@ class MainWindow:
                 command=partial_func,
                 bootstyle="primary.TButton",
             )
-            quiz_button.pack(pady=PaddingAndSize.between)
+            quiz_button.pack(pady=self.window_options.between)
             self.quiz_buttons.append(quiz_button)
 
     def start(self):
@@ -89,12 +90,12 @@ class MainWindow:
             text="Welcome to ChemCards",
             font=FontDefaults.title(),
         )
-        self.title_label.pack(pady=PaddingAndSize.edge)
+        self.title_label.pack(pady=self.window_options.edge)
 
         self.subtitle_label = tb.Label(
             text="Choose a quiz to start", font=FontDefaults.subtitle()
         )
-        self.subtitle_label.pack(pady=PaddingAndSize.between)
+        self.subtitle_label.pack(pady=self.window_options.between)
 
         self.add_quiz_buttons()
 

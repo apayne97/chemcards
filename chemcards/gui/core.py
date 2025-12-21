@@ -21,29 +21,33 @@ class FontDefaults:
     subtitle = TKFontStyle(font="MS Serif", size=36, weight=FontWeight.bold)
     text = TKFontStyle(font="Helvetica", size=18, weight=FontWeight.bold)
 
-class PaddingAndSize:
-    window_height = 1200
-    window_width = 1600
-    frame_padding = 20
-    edge = 40
-    between = 20
 
-    @classmethod
-    @property
-    def window_size(cls) -> str:
-        return f"{cls.window_width}x{cls.window_height}"
+from pydantic import BaseModel, computed_field
 
-    @classmethod
-    @property
-    def frame_height(cls):
-        return cls.window_height - cls.frame_padding
 
-    @classmethod
-    @property
-    def frame_width(cls):
-        return cls.window_width - cls.frame_padding
+class WindowOptions(BaseModel):
+    window_height: int = 1200
+    window_width: int = 1600
+    frame_padding: int = 20
+    edge: int = 40
+    between: int = 20
 
-    @classmethod
+    @computed_field
     @property
-    def frame_size(cls):
-        return f"{cls.frame_width}x{cls.frame_height}"
+    def window_size(self) -> str:
+        return f"{self.window_width}x{self.window_height}"
+
+    @computed_field
+    @property
+    def frame_height(self) -> int:
+        return self.window_height - self.frame_padding
+
+    @computed_field
+    @property
+    def frame_width(self) -> int:
+        return self.window_width - self.frame_padding
+
+    @computed_field
+    @property
+    def frame_size(self) -> str:
+        return f"{self.frame_width}x{self.frame_height}"
