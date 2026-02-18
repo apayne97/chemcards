@@ -29,7 +29,7 @@ class MultipleChoiceQuizBase:
         self.total_number_of_questions = 0
         self.main_window = main_window
         self.gui = main_window.gui
-        self.window_options = WindowOptions()
+        self.window_options = WindowOptions.from_screen()
 
         self.frame = tb.Frame(
             self.gui,

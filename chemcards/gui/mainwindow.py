@@ -24,7 +24,7 @@ QUIZZES = {
 
 class MainWindow:
     def __init__(self):
-        self.window_options = WindowOptions()
+        self.window_options = WindowOptions.from_screen()
         self.gui = tb.Window(themename="superhero")
         self.gui.title("ChemCards")
         self.gui.geometry(self.window_options.window_size)

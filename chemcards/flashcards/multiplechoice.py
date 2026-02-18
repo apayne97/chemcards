@@ -91,7 +91,7 @@ class MultipleChoiceMoleculeToFunctionalGroupNameGenerator(FlashCardGeneratorBas
         chosen = example_fgs[correct]
         # Ask which name corresponds to the SMARTS pattern; display the functional group as a molecule
         return MultipleChoice(
-            question=f"Which functional group is this SMARTS pattern?",
+            question=f"What is the name of this functional group?",
             display=chosen,
             choices=[fg.name for fg in example_fgs],
             answer_index=correct,

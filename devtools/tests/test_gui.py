@@ -11,7 +11,7 @@ def molecule():
 
 def test_main_window_settings(molecule):
     from chemcards.gui.core import WindowOptions
-    wo = WindowOptions()
+    wo = WindowOptions.from_screen()
 
 @pytest.mark.skip(reason="Not sure how to test window creation")
 def test_chembl_link(molecule):
