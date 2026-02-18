@@ -244,27 +244,26 @@ class MultipleChoiceImageToTextQuizBase(MultipleChoiceQuizBase):
 
     def make_frames(self):
         self.title_frame = tb.Frame(self.frame)
-        self.title_frame.grid(row=0, pady=self.window_options.between)
+        self.title_frame.grid(row=0, columnspan=4, pady=self.window_options.between)
 
         self.question_frame = tb.Frame(self.frame)
 
         # Anchor the question frame to the left of its column
-        self.question_frame.grid(row=1, column=0, pady=self.window_options.between, padx=self.window_options.between, sticky='w')
+        self.question_frame.grid(row=1, column=1, pady=self.window_options.between, padx=self.window_options.between, sticky='e')
 
         self.display_frame = tb.Frame(self.frame)
         # Keep the display frame to the right of the question frame and anchor it to the left so it sits adjacent
-        self.display_frame.grid(row=1, column=1, pady=self.window_options.between, padx=self.window_options.between, sticky='w')
+        self.display_frame.grid(row=1, column=2, pady=self.window_options.between, padx=self.window_options.between, sticky='w')
 
         # Prevent the frame columns from expanding and pushing the display to the far right
-        try:
-            # grid_columnconfigure may not be necessary in all tk wrappers, but it's safe to call
-            self.frame.grid_columnconfigure(0, weight=0)
-            self.frame.grid_columnconfigure(1, weight=0)
-        except Exception:
-            pass
+        # grid_columnconfigure may not be necessary in all tk wrappers, but it's safe to call
+        self.frame.grid_columnconfigure(0, weight=0)
+        self.frame.grid_columnconfigure(1, weight=1)
+        self.frame.grid_columnconfigure(2, weight=1)
+        self.frame.grid_columnconfigure(3, weight=0)
 
         self.control_frame = tb.Frame(self.frame)
-        self.control_frame.grid(row=2, columnspan=2, pady=self.window_options.between)
+        self.control_frame.grid(row=2, columnspan=4, pady=self.window_options.between)
 
     def _make_buttons(self):
         # Title
