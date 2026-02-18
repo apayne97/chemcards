@@ -4,14 +4,12 @@ import ttkbootstrap as tb
 
 from chemcards.gui.core import WindowOptions, FontDefaults
 from chemcards.gui.quizwindow import (
-    MultipleChoiceQuizBase,
     MultipleChoiceMoleculeToTargetQuiz,
     MultipleChoiceMoleculeToNameQuiz,
     MultipleChoiceNameToMoleculeQuiz,
+    MultipleChoiceMoleculeToFunctionalGroupNameQuiz,
 )
 from functools import partial
-
-# QUIZZES = [MultipleChoiceMoleculeToTargetQuiz, MultipleChoiceMoleculeToNameQuiz]
 
 QUIZZES = {
     quiz.name: quiz
@@ -19,6 +17,7 @@ QUIZZES = {
         MultipleChoiceMoleculeToTargetQuiz,
         MultipleChoiceMoleculeToNameQuiz,
         MultipleChoiceNameToMoleculeQuiz,
+        MultipleChoiceMoleculeToFunctionalGroupNameQuiz,
     ]
 }
 

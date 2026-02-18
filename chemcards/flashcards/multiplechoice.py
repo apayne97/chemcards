@@ -4,14 +4,18 @@ from chemcards.database.core import MoleculeEntry
 from chemcards.flashcards.core import FlashCardBase, FlashCardGeneratorBase
 import random
 from abc import abstractmethod
+from typing import Optional, Union
+from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, FunctionalGroup
 
 
 class MultipleChoice(FlashCardBase):
     question: str
-    display: MoleculeEntry = Field(None, description="Molecule to display if required")
+    display: Optional[Union[MoleculeEntry, FunctionalGroup]] = Field(
+        None, description="Molecule or functional group to display if required"
+    )
     choices: list
     answer_index: int
-    answer_molecule: MoleculeEntry = Field(
+    answer_molecule: Optional[MoleculeEntry] = Field(
         None, description="Molecule to view the information of if required"
     )
 
@@ -71,4 +75,25 @@ class MultipleChoiceNameToMoleculeGenerator(FlashCardGeneratorBase):
             choices=[mol for mol in example_molecules],
             answer_index=correct,
             answer_molecule=example_molecules[correct],
+        )
+
+
+class MultipleChoiceMoleculeToFunctionalGroupNameGenerator(FlashCardGeneratorBase):
+
+    name = "Multiple Choice - Functional Group (SMARTS) to Name"
+
+    def next(self) -> MultipleChoice:
+        # Sample functional groups directly from the project's functional_groups.yaml
+        # Be robust if the data file has fewer than 4 entries
+        sample_count = min(4, len(FUNCTIONAL_GROUPS))
+        example_fgs = random.sample(FUNCTIONAL_GROUPS, sample_count)
+        correct = random.randrange(sample_count)
+        chosen = example_fgs[correct]
+        # Ask which name corresponds to the SMARTS pattern; display the functional group as a molecule
+        return MultipleChoice(
+            question=f"Which functional group is this SMARTS pattern?",
+            display=chosen,
+            choices=[fg.name for fg in example_fgs],
+            answer_index=correct,
+            answer_molecule=None,
         )

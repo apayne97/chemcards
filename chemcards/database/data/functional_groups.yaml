@@ -47,3 +47,5 @@
   smarts: "[NX3]1[CX4][CX4][CX3]1(=[OX1])"
 - name: morpholine
   smarts: "O1CC[NH1]CC1"
+- name: phenyl acetamide
+  smarts: "CC(=O)NC1=CC=CC=C1"

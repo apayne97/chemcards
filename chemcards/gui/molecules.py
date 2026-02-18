@@ -1,16 +1,14 @@
 from chemcards.database.resources import TEMP_DIR
 from chemcards.database.core import MoleculeEntry
-from chemcards.database.cheminformatics import FunctionalGroup, AnnotatedMoleculeEntry
+from chemcards.database.cheminformatics import FunctionalGroup
 from chemcards.gui.core import WindowOptions
 from chemcards.database.services.chembl import open_chembl_molecule_link
-from pydantic import BaseModel
 from pathlib import Path
-import tempfile
 from rdkit.Chem import Draw
 from PIL import ImageTk, Image
-import tkinter as tk
 from functools import partial
 import ttkbootstrap as tb
+from typing import Union
 
 HIGHLIGHT_COLORS = [
     (r / 256, g / 256, b / 256) for r, g, b in [(68, 178, 212), (39, 136, 169)]
@@ -18,7 +16,8 @@ HIGHLIGHT_COLORS = [
 
 
 class MoleculeViz:
-    def __init__(self, molecule: MoleculeEntry):
+    def __init__(self, molecule: Union[MoleculeEntry, FunctionalGroup]):
+        # Accept either a MoleculeEntry or a FunctionalGroup (both provide .name and a to_rdkit())
         self.molecule = molecule
 
     @property
@@ -36,6 +35,7 @@ class MoleculeViz:
 
         # if not self.img_path.exists():
         self.img_path.parent.mkdir(exist_ok=True)
+        # Both MoleculeEntry and FunctionalGroup expose a to_rdkit() method
         mol = self.molecule.to_rdkit()
 
         if highlight_functional_groups:
@@ -128,5 +128,47 @@ class MoleculeWindow:
             command=partial_func,
         )
         chembl_button.grid(row=i, column=1)
+
+        self.gui.mainloop()
+
+
+class FunctionalGroupWindow:
+
+    def __init__(self, functional_group: FunctionalGroup, gui: tb.Window = None):
+        if gui is None:
+            self.gui = tb.Window(themename="superhero")
+        else:
+            self.gui = tb.Toplevel(gui)
+        self.gui.title(functional_group.name)
+
+        self.image_frame = tb.Frame(self.gui)
+        self.image_frame.grid(row=0, pady=WindowOptions.edge, padx=WindowOptions.edge)
+
+        self.text_frame = tb.Frame(self.gui)
+        self.text_frame.grid(
+            row=1, column=0, pady=WindowOptions.between, padx=WindowOptions.edge
+        )
+
+        # Add FG Image
+        mviz = MoleculeViz(molecule=functional_group)
+        img = mviz.get_image()
+
+        image_label = tb.Label(self.image_frame)
+        image_label.pack()
+        image_label.image = img
+        image_label.configure(image=img)
+
+        # Add Text: name and smarts
+        name_label = tb.Label(self.text_frame, text="name", bootstyle="info")
+        name_label.grid(row=0, column=0)
+        name_val = tb.Entry(self.text_frame, width=60)
+        name_val.insert(0, functional_group.name)
+        name_val.grid(row=0, column=1)
+
+        smarts_label = tb.Label(self.text_frame, text="smarts", bootstyle="info")
+        smarts_label.grid(row=1, column=0)
+        smarts_val = tb.Entry(self.text_frame, width=80)
+        smarts_val.insert(0, functional_group.smarts)
+        smarts_val.grid(row=1, column=1)
 
         self.gui.mainloop()

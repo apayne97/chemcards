@@ -13,6 +13,8 @@ from chemcards.flashcards.multiplechoice import (
     MultipleChoiceMoleculeToTargetGenerator,
     MultipleChoiceMoleculeToNameGenerator,
     MultipleChoiceNameToMoleculeGenerator,
+    MultipleChoiceMoleculeToFunctionalGroupNameGenerator
+
 )
 from chemcards.gui.core import WindowOptions, FontDefaults
 from chemcards.gui.molecules import MoleculeViz, MoleculeWindow
@@ -93,7 +95,21 @@ class MultipleChoiceQuizBase:
         end_button.grid(row=1, column=2, padx=self.window_options.between)
 
     def make_molecule_window(self):
-        MoleculeWindow(self.current_question.answer_molecule, self.gui)
+        # Show the answer_molecule if present, otherwise show the display (which may be a FunctionalGroup)
+        target = None
+        if getattr(self, 'current_question', None):
+            if self.current_question.answer_molecule:
+                target = self.current_question.answer_molecule
+            elif self.current_question.display:
+                target = self.current_question.display
+        if target is not None:
+            # If the target is a FunctionalGroup, open the FunctionalGroupWindow
+            from chemcards.database.cheminformatics import FunctionalGroup
+            from chemcards.gui.molecules import FunctionalGroupWindow
+            if isinstance(target, FunctionalGroup):
+                FunctionalGroupWindow(target, self.gui)
+            else:
+                MoleculeWindow(target, self.gui)
 
     def add_molecule_info_button(self):
         molecule_info_button = tb.Button(
@@ -232,14 +248,20 @@ class MultipleChoiceImageToTextQuizBase(MultipleChoiceQuizBase):
 
         self.question_frame = tb.Frame(self.frame)
 
-        self.question_frame.grid(
-            row=1, column=0, pady=self.window_options.between, padx=self.window_options.between
-        )
+        # Anchor the question frame to the left of its column
+        self.question_frame.grid(row=1, column=0, pady=self.window_options.between, padx=self.window_options.between, sticky='w')
 
         self.display_frame = tb.Frame(self.frame)
-        self.display_frame.grid(
-            row=1, column=1, pady=self.window_options.between, padx=self.window_options.between
-        )
+        # Keep the display frame to the right of the question frame and anchor it to the left so it sits adjacent
+        self.display_frame.grid(row=1, column=1, pady=self.window_options.between, padx=self.window_options.between, sticky='w')
+
+        # Prevent the frame columns from expanding and pushing the display to the far right
+        try:
+            # grid_columnconfigure may not be necessary in all tk wrappers, but it's safe to call
+            self.frame.grid_columnconfigure(0, weight=0)
+            self.frame.grid_columnconfigure(1, weight=0)
+        except Exception:
+            pass
 
         self.control_frame = tb.Frame(self.frame)
         self.control_frame.grid(row=2, columnspan=2, pady=self.window_options.between)
@@ -257,7 +279,8 @@ class MultipleChoiceImageToTextQuizBase(MultipleChoiceQuizBase):
 
         # Display
         self.display_panel = tb.Label(self.display_frame)
-        self.display_panel.pack(anchor="e")
+        # Center the display image within its frame so it appears right next to the options
+        self.display_panel.pack(anchor="center", padx=self.window_options.between, pady=self.window_options.between)
 
         # Options
         # initialize the list with an empty list of options
@@ -325,3 +348,9 @@ class MultipleChoiceNameToMoleculeQuiz(MultipleChoiceTextToImageQuizBase):
 
     def get_question_generator(self) -> FlashCardGeneratorBase:
         return MultipleChoiceNameToMoleculeGenerator(self.molecule_database)
+
+class MultipleChoiceMoleculeToFunctionalGroupNameQuiz(MultipleChoiceImageToTextQuizBase):
+    name = MultipleChoiceMoleculeToFunctionalGroupNameGenerator.name
+
+    def get_question_generator(self) -> FlashCardGeneratorBase:
+        return MultipleChoiceMoleculeToFunctionalGroupNameGenerator(self.molecule_database)

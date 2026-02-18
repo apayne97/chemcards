@@ -1,4 +1,5 @@
 import json
+import logging
 from chemcards.database.resources import (
     CHEMBL_DOWNLOAD,
     CHEMBL_MECHANISM_DOWNLOAD,
@@ -6,6 +7,8 @@ from chemcards.database.resources import (
 )
 from chemcards.database.core import MoleculeEntry, MoleculeDB
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 def download_drug_molecules():
@@ -61,31 +64,42 @@ class ChemblMoleculeEntry(MoleculeEntry):
     target_chembl_id: str
 
     @classmethod
-    def from_download(cls, entry:dict) -> "ChemblMoleculeEntry":
-        name = entry["pref_name"]
-        smiles = entry["molecule_structures"]["canonical_smiles"]
-        target = entry["usan_stem_definition"]
-        # indication = entry["indication_class"]
-        molecule_chembl_id = entry["molecule_chembl_id"]
+    def from_download(cls, entry: dict) -> "ChemblMoleculeEntry|None":
+        try:
+            # Prefer human-readable name, fall back to chembl id
+            name = entry.get("pref_name") or entry.get("molecule_chembl_id") or "unknown"
 
-        if target is None:
-            target = "unknown"
-        # if indication is None:
-        #     indication = "unknown"
-        return cls(
-            name=name,
-            smiles=smiles,
-            target=target,
-            # indication=indication,
-            molecule_chembl_id=molecule_chembl_id,
-            target_chembl_id="unknown",
-        )
+            mol_struct = entry.get("molecule_structures")
+            if not mol_struct:
+                # No structure recorded for this entry; skip it
+                return None
+            smiles = mol_struct.get("canonical_smiles")
+            if not smiles:
+                return None
+
+            target = entry.get("usan_stem_definition") or "unknown"
+            molecule_chembl_id = entry.get("molecule_chembl_id") or "unknown"
+
+            return cls(
+                name=name,
+                smiles=smiles,
+                target=target,
+                molecule_chembl_id=molecule_chembl_id,
+                target_chembl_id="unknown",
+            )
+        except Exception as e:
+            logger.debug("Failed to parse ChemBL molecule entry: %s", e)
+            # If anything unexpected happens while parsing, skip this entry
+            return None
 
         # except Exception as e:
         #     # print(f"Unable to extract a Molecule Object from Chembl entry: {entry}")
         #     return
 
+
 CHEMBL_URL = "https://www.ebi.ac.uk/chembl/compound_report_card/"
+
+
 def open_chembl_molecule_link(molecule: ChemblMoleculeEntry):
     import webbrowser
 
@@ -112,12 +126,33 @@ class ChemblMechanismEntry(BaseModel):
         return new_client.molecule.filter(molecule_chembl_id=self.molecule_chembl_id)[0]
 
     @classmethod
-    def from_download(cls, entry) -> "ChemblMechanismEntry":
+    def from_download(cls, entry) -> "ChemblMechanismEntry|None":
+        try:
+            # Normalize parent -> molecule id if present
+            parent = entry.get("parent_molecule_chembl_id", None)
+            if parent is not None:
+                entry["molecule_chembl_id"] = parent
 
-        parent = entry.get('parent_molecule_chembl_id', None)
-        if parent is not None:
-            entry['molecule_chembl_id'] = parent
-        return cls(**entry)
+            mol_id = entry.get("molecule_chembl_id")
+            target_id = entry.get("target_chembl_id")
+
+            # mechanism_of_action and action_type may be missing; provide sensible defaults
+            moa = entry.get("mechanism_of_action") or entry.get("mechanism") or "unknown"
+            action = entry.get("action_type") or "unknown"
+
+            # If required identifiers are missing, skip this mechanism entry
+            if not mol_id or not target_id:
+                return None
+
+            return cls(
+                molecule_chembl_id=mol_id,
+                target_chembl_id=target_id,
+                mechanism_of_action=moa,
+                action_type=action,
+            )
+        except Exception as e:
+            logger.debug("Failed to parse ChemBL mechanism entry: %s", e)
+            return None
 
         # except Exception as e:
         #     # print(f"Unable to extract a Molecule Object from Chembl entry: {entry}")
@@ -131,10 +166,11 @@ class ChemblDB(MoleculeDB):
         with open(CHEMBL_DOWNLOAD, "r") as f:
             molecule_list = json.load(f)
 
-        converted_molecules = [
-            ChemblMoleculeEntry.from_download(entry) for entry in molecule_list
-        ]
-        converted_molecules = [mol for mol in converted_molecules if mol is not None]
+        raw_converted = [ChemblMoleculeEntry.from_download(entry) for entry in molecule_list]
+        skipped = sum(1 for x in raw_converted if x is None)
+        converted_molecules = [mol for mol in raw_converted if mol is not None]
+
+        logger.info("ChemBL molecules: converted=%d skipped=%d", len(converted_molecules), skipped)
 
         return cls(molecules=converted_molecules)
 
@@ -148,30 +184,52 @@ class ChemblDB(MoleculeDB):
 
         with open(CHEMBL_MECHANISM_DOWNLOAD, "r") as f:
             mechanism_list = json.load(f)
-        initial_loaded_mechanism = [
-            ChemblMechanismEntry.from_download(entry) for entry in mechanism_list
-        ]
-        filtered_mechanism_list = [m for m in initial_loaded_mechanism if m is not None]
+        raw_mechanisms = [ChemblMechanismEntry.from_download(entry) for entry in mechanism_list]
+        skipped_mechanisms = sum(1 for x in raw_mechanisms if x is None)
+        filtered_mechanism_list = [m for m in raw_mechanisms if m is not None]
+
+        logger.info("ChemBL mechanisms: loaded=%d skipped=%d", len(filtered_mechanism_list), skipped_mechanisms)
 
         converted_molecules = []
+        skipped_molecule_lookups = 0
+        skipped_build_failures = 0
         for loaded_mechanism in tqdm(filtered_mechanism_list):
-            molecule = ChemblMoleculeEntry.from_download(
-                loaded_mechanism.query_chembl_for_molecule()
-            )
-            if molecule is None:
+            try:
+                mol_dict = loaded_mechanism.query_chembl_for_molecule()
+            except Exception as e:
+                logger.debug("Failed to query ChemBL for molecule %s: %s", loaded_mechanism.molecule_chembl_id, e)
+                skipped_molecule_lookups += 1
                 continue
-            converted_molecules.append(
-                ChemblMoleculeEntry(
-                    name=molecule.name,
-                    smiles=molecule.smiles,
-                    target=loaded_mechanism.query_chembl_for_target(),
-                    indication=molecule.indication,
-                    molecule_chembl_id=loaded_mechanism.molecule_chembl_id,
-                    target_chembl_id=loaded_mechanism.target_chembl_id,
-                    mechanism_of_action=loaded_mechanism.mechanism_of_action,
-                    action_type=loaded_mechanism.action_type,
+
+            molecule = ChemblMoleculeEntry.from_download(mol_dict)
+            if molecule is None:
+                # Could not construct a molecule from the queried data
+                skipped_molecule_lookups += 1
+                continue
+            try:
+                converted_molecules.append(
+                    ChemblMoleculeEntry(
+                        name=molecule.name,
+                        smiles=molecule.smiles,
+                        target=loaded_mechanism.query_chembl_for_target(),
+                        indication=molecule.indication,
+                        molecule_chembl_id=loaded_mechanism.molecule_chembl_id,
+                        target_chembl_id=loaded_mechanism.target_chembl_id,
+                        mechanism_of_action=loaded_mechanism.mechanism_of_action,
+                        action_type=loaded_mechanism.action_type,
+                    )
                 )
-            )
+            except Exception as e:
+                logger.debug("Failed to build converted molecule from mechanism entry: %s", e)
+                skipped_build_failures += 1
+                continue
+
+        logger.info(
+            "ChemBL mechanism conversion: converted=%d skipped_lookup=%d skipped_build=%d",
+            len(converted_molecules),
+            skipped_molecule_lookups,
+            skipped_build_failures,
+        )
         return cls(molecules=converted_molecules)
 
 
