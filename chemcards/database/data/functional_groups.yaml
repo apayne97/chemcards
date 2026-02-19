@@ -3,10 +3,10 @@
 - name: acylimidazole
   category: imidazole
   smarts:  "[#6][CX3](=[OX1])n1cncc1"
-- name: ortho-quinone
+- name: para-quinone
   category: quinone
   smarts: "[#6X3]1=,:[#6X3]-,:[#6X3](=[OX1])-,:[#6X3]=,:[#6X3]-,:[#6X3]1(=[OX1])"
-- name: para-quinone
+- name: ortho-quinone
   category: quinone
   smarts: "[#6X3]1(=[OX1])-,:[#6X3](=[OX1])-,:[#6X3]=,:[#6X3]-,:[#6X3]=,:[#6X3]1"
 - name: thiophene
@@ -17,15 +17,16 @@
 - name: 1,2-thiazole
   category: thiazole
   smarts: "s1nccc1"
-- name: 1,3-oxazole
-  category: oxazole
-  smarts: "o1cncc1"
-- name: 1,3-thiazole
-  category: thiazole
-  smarts: "s1cncc1"
-- name: 1,2,4-triazole
-  category: triazole
-  smarts: "n1ncnc1"
+# gonna comment these out
+#- name: 1,3-oxazole
+#  category: oxazole
+#  smarts: "o1cncc1"
+#- name: 1,3-thiazole
+#  category: thiazole
+#  smarts: "s1cncc1"
+#- name: 1,2,4-triazole
+#  category: triazole
+#  smarts: "n1ncnc1"
 - name: 1,2,3-triazole
   category: triazole
   smarts: "n1nncc1"
