@@ -1,17 +1,18 @@
 name: chemcards
 channels:
   - conda-forge
-  - defaults
 dependencies:
+  - numpy
+  - pillow
+  - yaml
+  - easydict
   - pip
+  - idna
   - pydantic
   - rdkit
-  - pillow
-  - tqdm
   - requests
-  - numpy
-  - idna
-  - easydict
-  - yaml
+  - tqdm
   - pyyaml
-prefix: /Users/alexpayne/miniconda3/envs/chemcards
+  - click
+  - pyttk
+prefix: /Users/apayne/miniforge3/envs/chemcards

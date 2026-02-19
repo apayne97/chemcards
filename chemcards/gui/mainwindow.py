@@ -4,14 +4,12 @@ import ttkbootstrap as tb
 
 from chemcards.gui.core import WindowOptions, FontDefaults
 from chemcards.gui.quizwindow import (
-    MultipleChoiceQuizBase,
     MultipleChoiceMoleculeToTargetQuiz,
     MultipleChoiceMoleculeToNameQuiz,
     MultipleChoiceNameToMoleculeQuiz,
+    MultipleChoiceMoleculeToFunctionalGroupNameQuiz,
 )
 from functools import partial
-
-# QUIZZES = [MultipleChoiceMoleculeToTargetQuiz, MultipleChoiceMoleculeToNameQuiz]
 
 QUIZZES = {
     quiz.name: quiz
@@ -19,13 +17,14 @@ QUIZZES = {
         MultipleChoiceMoleculeToTargetQuiz,
         MultipleChoiceMoleculeToNameQuiz,
         MultipleChoiceNameToMoleculeQuiz,
+        MultipleChoiceMoleculeToFunctionalGroupNameQuiz,
     ]
 }
 
 
 class MainWindow:
     def __init__(self):
-        self.window_options = WindowOptions()
+        self.window_options = WindowOptions.from_screen()
         self.gui = tb.Window(themename="superhero")
         self.gui.title("ChemCards")
         self.gui.geometry(self.window_options.window_size)
