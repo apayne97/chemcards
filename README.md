@@ -12,24 +12,6 @@ ChemCards is an interactive study tool designed for chemistry students and profe
 
 The application uses RDKit for molecule visualization and provides a GUI-based quiz system powered by tkinter/ttkbootstrap.
 
-## Features
-
-- 🧪 **Multiple Quiz Modes**
-  - Molecule to Target
-  - Molecule to Name
-  - Name to Molecule
-  - Functional Group (SMARTS) to Name
-
-- 📚 **Comprehensive Database**
-  - 21 functional groups with SMARTS patterns
-  - ~2000 FDA-approved drugs from ChEMBL
-  - Downloadable and updateable molecule database
-
-- 📄 **PDF Catalog Generation**
-  - Generate visual catalogs of molecules
-  - Separate or combined PDFs for functional groups and drugs
-  - Searchable molecule names
-
 ## Installation
 
 ### Prerequisites
@@ -41,7 +23,7 @@ The application uses RDKit for molecule visualization and provides a GUI-based q
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/apayne97/chemcards
 cd chemcards
 
 # Create environment from the provided file
