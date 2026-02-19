@@ -50,3 +50,8 @@
   smarts: "O1CC[NH1]CC1"
 - name: phenyl acetamide
   smarts: "CC(=O)NC1=CC=CC=C1"
+- name: sulfonamide
+  smarts: "CS(=O)(=O)N"
+#  smarts: "[#16X4]([NX3])(=[OX1])(=[OX1])[#6]"
+#  smarts: "[S&D5](=O)(=O)[N]"
+#  smarts: "[$([#16X4]([NX3])(=[OX1])(=[OX1])[#6]),$([#16X4+2]([NX3])([OX1-])([OX1-])[#6])]"
