@@ -29,6 +29,12 @@ MIN_HEAVY_ATOMS = 5
 MAX_HEAVY_ATOMS = 29
 LIGHT_BLUE_HIGHLIGHT = (68 / 256, 178 / 256, 212 / 256)
 PDF_RESOLUTION_DPI = 300.0
+DEFAULT_MOLS_PER_ROW = 4
+# Non-square: extra height gives room for 3-line legend
+DEFAULT_IMG_SIZE = (500, 300)
+LEGEND_FONT_SIZE = 28
+LEGEND_FRACTION = 0.35   # fraction of subImgSize height reserved for legend text
+GRID_PADDING = 0.00
 
 
 def _catalog_draw_options():
@@ -36,13 +42,20 @@ def _catalog_draw_options():
     dopts = Draw.rdMolDraw2D.MolDrawOptions()
     dopts.setHighlightColour(LIGHT_BLUE_HIGHLIGHT)
     dopts.highlightBondWidthMultiplier = 20
+    dopts.legendFontSize = LEGEND_FONT_SIZE
+    dopts.maxFontSize = LEGEND_FONT_SIZE   # must match legendFontSize, otherwise RDKit caps it
+    dopts.legendFraction = LEGEND_FRACTION
+    dopts.padding = GRID_PADDING
     return dopts
 
 
 def _format_functional_group_legend(item: dict) -> str:
     """Build a multiline legend for functional-group example entries."""
     category = item["category"].replace("_", " ").capitalize()
-    return f"{category}\n{item['name']}\n{item['smarts']}"
+    return (f"{category}"
+            f"\n{item['name']}"
+            # f"\n{item['smarts']}"
+            )
 
 
 def _load_functional_groups(yaml_path: Path):
@@ -170,8 +183,8 @@ def generate_catalog(
     out_pdf: Path | str | None = None,
     functional_groups: bool = True,
     fda_approved: bool = True,
-    mols_per_row: int = 4,
-    img_size: tuple = (400, 400),
+    mols_per_row: int = DEFAULT_MOLS_PER_ROW,
+    img_size: tuple = DEFAULT_IMG_SIZE,
 ):
     """Generate molecule catalog PDF using RDKit's MolsToGridImage.
 
@@ -248,8 +261,8 @@ def generate_catalog_sections(
     out_dir: Path | str | None = None,
     functional_groups: bool = True,
     fda_approved: bool = True,
-    mols_per_row: int = 4,
-    img_size: tuple = (400, 400),
+    mols_per_row: int = DEFAULT_MOLS_PER_ROW,
+    img_size: tuple = DEFAULT_IMG_SIZE,
 ):
     """Generate separate PDF files for each section.
 
@@ -318,6 +331,7 @@ def generate_catalog_sections(
                 molsPerRow=mols_per_row,
                 subImgSize=img_size,
                 legends=legends,
+                drawOptions=_catalog_draw_options(),
                 returnPNG=False
             )
 
