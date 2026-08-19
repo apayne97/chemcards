@@ -84,14 +84,22 @@ class MoleculeWindow:
             self.gui = tb.Window(themename="superhero")
         else:
             self.gui = tb.Toplevel(gui)
+        self.window_options = WindowOptions.from_screen(self.gui)
         self.gui.title(molecule.name)
 
         self.image_frame = tb.Frame(self.gui)
-        self.image_frame.grid(row=0, pady=WindowOptions.edge, padx=WindowOptions.edge)
+        self.image_frame.grid(
+            row=0,
+            pady=self.window_options.edge,
+            padx=self.window_options.edge,
+        )
 
         self.text_frame = tb.Frame(self.gui)
         self.text_frame.grid(
-            row=1, column=0, pady=WindowOptions.between, padx=WindowOptions.edge
+            row=1,
+            column=0,
+            pady=self.window_options.between,
+            padx=self.window_options.edge,
         )
 
         # Add Mol Image
@@ -129,7 +137,9 @@ class MoleculeWindow:
         )
         chembl_button.grid(row=i, column=1)
 
-        self.gui.mainloop()
+        # Only run the event loop when this window is launched standalone.
+        if gui is None:
+            self.gui.mainloop()
 
 
 class FunctionalGroupWindow:
@@ -139,14 +149,22 @@ class FunctionalGroupWindow:
             self.gui = tb.Window(themename="superhero")
         else:
             self.gui = tb.Toplevel(gui)
+        self.window_options = WindowOptions.from_screen(self.gui)
         self.gui.title(functional_group.name)
 
         self.image_frame = tb.Frame(self.gui)
-        self.image_frame.grid(row=0, pady=WindowOptions.edge, padx=WindowOptions.edge)
+        self.image_frame.grid(
+            row=0,
+            pady=self.window_options.edge,
+            padx=self.window_options.edge,
+        )
 
         self.text_frame = tb.Frame(self.gui)
         self.text_frame.grid(
-            row=1, column=0, pady=WindowOptions.between, padx=WindowOptions.edge
+            row=1,
+            column=0,
+            pady=self.window_options.between,
+            padx=self.window_options.edge,
         )
 
         # Add FG Image
@@ -171,4 +189,6 @@ class FunctionalGroupWindow:
         smarts_val.insert(0, functional_group.smarts)
         smarts_val.grid(row=1, column=1)
 
-        self.gui.mainloop()
+        # Only run the event loop when this window is launched standalone.
+        if gui is None:
+            self.gui.mainloop()
