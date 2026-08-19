@@ -2,7 +2,7 @@
   category: carbonyl_derivatives
   smarts: "[F,Cl,Br][CX3](=[OX1])[#1,*&!$([OH1])&!$([SH1])]"
 - name: acylimidazole
-  category: heteroaromatic_rings
+  category: nitrogen_heteroaromatic
   smarts:  "[#6][CX3](=[OX1])n1cncc1"
 - name: para-quinone
   category: carbonyl_derivatives
@@ -11,13 +11,13 @@
   category: carbonyl_derivatives
   smarts: "[#6X3]1(=[OX1])-,:[#6X3](=[OX1])-,:[#6X3]=,:[#6X3]-,:[#6X3]=,:[#6X3]1"
 - name: thiophene
-  category: heteroaromatic_rings
+  category: sulfur_heteroaromatic
   smarts: "c1ccc[sX2]1"
 - name: 1,2-oxazole
-  category: heteroaromatic_rings
+  category: multiple_heteroatom_heteroaromatic
   smarts: "o1nccc1"
 - name: 1,2-thiazole
-  category: heteroaromatic_rings
+  category: multiple_heteroatom_heteroaromatic
   smarts: "s1nccc1"
 # gonna comment these out
 #- name: 1,3-oxazole
@@ -29,17 +29,47 @@
 #- name: 1,2,4-triazole
 #  category: triazole
 #  smarts: "n1ncnc1"
+- name: furan
+  category: oxygen_heteroaromatic
+  smarts: "o1cccc1"
+- name: pyrrole
+  category: nitrogen_heteroaromatic
+  smarts: "[nH]1cccc1"
+- name: imidazole
+  category: nitrogen_heteroaromatic
+  smarts: "c1c[nH]cn1"
+- name: pyrazole
+  category: nitrogen_heteroaromatic
+  smarts: "c1cc[nH]n1"
+- name: 1,2,4-triazole
+  category: nitrogen_heteroaromatic
+  smarts: "n1ncnc1"
+- name: pyrimidine
+  category: nitrogen_heteroaromatic
+  smarts: "n1cnccc1"
+- name: pyridazine
+  category: nitrogen_heteroaromatic
+  smarts: "n1ncccc1"
+- name: pyrazine
+  category: nitrogen_heteroaromatic
+  smarts: "n1ccncc1"
+- name: 1,3-oxazole
+  category: multiple_heteroatom_heteroaromatic
+  smarts: "o1cncc1"
+- name: 1,3-thiazole
+  category: multiple_heteroatom_heteroaromatic
+  smarts: "s1cncc1"
 - name: 1,2,3-triazole
-  category: heteroaromatic_rings
+  category: nitrogen_heteroaromatic
   smarts: "n1nncc1"
 - name: pyridine
-  category: heteroaromatic_rings
+  category: nitrogen_heteroaromatic
   smarts: "n1ccccc1"
 - name: indole
-  category: heteroaromatic_rings
+  category: nitrogen_heteroaromatic
   smarts: "c1ccc2nccc2c1"
 - name: phenothiazine
-  category: heteroaromatic_rings
+  category: multiple_heteroatom_heteroaromatic
   smarts: "*-[#7]-1-c2ccccc2-[#16]-c2ccccc-12"
 - name: acyl hydrazine
   category: nitrogen_functionalities
@@ -54,7 +84,7 @@
   category: carbonyl_derivatives
   smarts: "[C,c](=O)[CX4,CR0X3,O][C,c](=O)"
 - name: beta-lactam
-  category: carbonyl_derivatives
+  category: amide_derivatives
   smarts: "[NX3]1[CX4][CX4][CX3]1(=[OX1])"
 - name: morpholine
   category: nitrogen_functionalities
@@ -87,7 +117,7 @@
   category: carbonyl_derivatives
   smarts: "[#6][CX3](=[OX1])[OX2][#6]"
 - name: amide
-  category: carbonyl_derivatives
+  category: amide_derivatives
   smarts: "[#6][CX3](=[OX1])[NX3]"
 - name: carboxylic acid
   category: carbonyl_derivatives

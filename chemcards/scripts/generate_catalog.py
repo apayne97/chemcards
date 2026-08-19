@@ -9,6 +9,7 @@ This approach uses RDKit's built-in grid rendering to save directly to PDF:
 Best for: most catalog generation use cases.
 """
 from pathlib import Path
+from itertools import groupby
 import json
 import logging
 from chemcards.database.core import MoleculeDB
@@ -20,6 +21,11 @@ except Exception:
     Chem = None
     Draw = None
 
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except Exception:
+    Image = None
+
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,13 +34,16 @@ DEFAULT_OUT_DIR = ROOT / "data" / "catalog_output"
 MIN_HEAVY_ATOMS = 5
 MAX_HEAVY_ATOMS = 29
 LIGHT_BLUE_HIGHLIGHT = (68 / 256, 178 / 256, 212 / 256)
+HEADER_BG_COLOR = (52, 136, 163)   # darker blue for category header backgrounds
+HEADER_TEXT_COLOR = (255, 255, 255)
+HEADER_FONT_SIZE = 52
 PDF_RESOLUTION_DPI = 300.0
 DEFAULT_MOLS_PER_ROW = 4
-# Non-square: extra height gives room for 3-line legend
+# Non-square: extra height gives room for 2-line legend (name + smarts)
 DEFAULT_IMG_SIZE = (500, 300)
 LEGEND_FONT_SIZE = 28
 LEGEND_FRACTION = 0.35   # fraction of subImgSize height reserved for legend text
-GRID_PADDING = 0.00
+GRID_PADDING = 0.02
 
 
 def _catalog_draw_options():
@@ -50,12 +59,122 @@ def _catalog_draw_options():
 
 
 def _format_functional_group_legend(item: dict) -> str:
-    """Build a multiline legend for functional-group example entries."""
-    category = item["category"].replace("_", " ").capitalize()
-    return (f"{category}"
-            f"\n{item['name']}"
-            # f"\n{item['smarts']}"
-            )
+    """Build a legend for functional-group example entries (name + smarts only; category is a page header)."""
+    return f"{item['name']}\n{item['smarts']}"
+
+
+def _make_header_image(label: str, width: int) -> "Image.Image":
+    """Create a PIL header banner image for a catalog category page."""
+    height = HEADER_FONT_SIZE + 40
+    img = Image.new("RGB", (width, height), color=HEADER_BG_COLOR)
+    draw = ImageDraw.Draw(img)
+
+    # Try a system font at the target size; fall back to PIL's default
+    font = None
+    for font_name in ["Arial.ttf", "DejaVuSans-Bold.ttf", "Helvetica.ttf", "FreeSansBold.ttf"]:
+        try:
+            font = ImageFont.truetype(font_name, HEADER_FONT_SIZE)
+            break
+        except (IOError, OSError):
+            continue
+    if font is None:
+        font = ImageFont.load_default()
+
+    # Centre the text horizontally
+    bbox = draw.textbbox((0, 0), label, font=font)
+    text_w = bbox[2] - bbox[0]
+    x = max(20, (width - text_w) // 2)
+    y = (height - (bbox[3] - bbox[1])) // 2
+    draw.text((x, y), label, fill=HEADER_TEXT_COLOR, font=font)
+    return img
+
+
+def _render_grouped_pages(
+    items: list[dict],
+    mols_per_row: int,
+    img_size: tuple,
+    legend_fn,
+    highlight: bool = False,
+    section_label: str | None = None,
+) -> list["Image.Image"]:
+    """Render a list of molecule items as PIL pages, with a category header per group.
+
+    Args:
+        items: list of dicts with at least 'mol', 'category', and legend fields.
+        mols_per_row: columns per row in the molecular grid.
+        img_size: (width, height) per cell in the grid.
+        legend_fn: callable(item) -> legend string.
+        highlight: whether items carry highlight_atoms / highlight_bonds.
+        section_label: if provided, overrides the per-item category (e.g. for FDA drugs).
+    Returns:
+        List of PIL Images, one per category group.
+    """
+    pages = []
+    grid_width = mols_per_row * img_size[0]
+
+    if section_label:
+        groups = [(section_label, items)]
+    else:
+        groups = [
+            (cat, list(grp))
+            for cat, grp in groupby(items, key=lambda x: x["category"])
+        ]
+
+    for category, group_items in groups:
+        mols    = [item["mol"] for item in group_items]
+        legends = [legend_fn(item) for item in group_items]
+        h_atoms = [item.get("highlight_atoms", tuple()) for item in group_items] if highlight else None
+        h_bonds = [item.get("highlight_bonds", tuple()) for item in group_items] if highlight else None
+
+        kwargs = dict(
+            molsPerRow=mols_per_row,
+            subImgSize=img_size,
+            legends=legends,
+            drawOptions=_catalog_draw_options(),
+            returnPNG=False,
+        )
+        if highlight:
+            kwargs["highlightAtomLists"] = h_atoms
+            kwargs["highlightBondLists"] = h_bonds
+
+        grid_img = Draw.MolsToGridImage(mols, **kwargs)
+
+        # Resize header to match the grid's actual rendered width
+        actual_width = grid_img.width
+        header_img = _make_header_image(category.replace("_", " ").upper(), actual_width)
+
+        page = Image.new("RGB", (actual_width, header_img.height + grid_img.height), (255, 255, 255))
+        page.paste(header_img, (0, 0))
+        page.paste(grid_img, (0, header_img.height))
+        pages.append(page)
+
+    return pages
+
+
+def _save_pages_as_pdf(pages: list["Image.Image"], out_pdf: Path) -> None:
+    """Save a list of PIL images as a multi-page PDF."""
+    if not pages:
+        return
+    pages[0].save(
+        str(out_pdf),
+        "PDF",
+        resolution=PDF_RESOLUTION_DPI,
+        save_all=True,
+        append_images=pages[1:],
+    )
+
+
+def _load_category_order(categories_yaml_path: Path) -> list[str]:
+    """Load the preferred category display order from YAML.
+
+    Categories are stored as human-readable strings (spaces, lowercase).
+    Returns a list in preferred order; unknown categories sort last.
+    """
+    import yaml
+    if not categories_yaml_path.exists():
+        return []
+    with categories_yaml_path.open("r", encoding="utf8") as fh:
+        return [str(c) for c in (yaml.safe_load(fh) or [])]
 
 
 def _load_functional_groups(yaml_path: Path):
@@ -66,14 +185,17 @@ def _load_functional_groups(yaml_path: Path):
     with yaml_path.open("r", encoding="utf8") as fh:
         data = yaml.safe_load(fh) or []
 
-    # Keep catalog output stable and grouped: category first, then name.
-    data = sorted(
-        data,
-        key=lambda item: (
-            (item.get("category") or "uncategorized").casefold(),
-            (item.get("name") or "unknown").casefold(),
-        ),
-    )
+    # Load preferred category order (normalise both sides to space-separated lowercase).
+    categories_path = yaml_path.parent / "functional_group_categories.yaml"
+    category_order = _load_category_order(categories_path)
+    # Map normalised category string -> sort index; unknowns go last.
+    category_rank = {c.lower(): i for i, c in enumerate(category_order)}
+
+    def _sort_key(item):
+        raw = (item.get("category") or "uncategorized").replace("_", " ").lower()
+        return (category_rank.get(raw, len(category_order)), (item.get("name") or "unknown").casefold())
+
+    data = sorted(data, key=_sort_key)
 
     groups = []
     for item in data:
@@ -218,42 +340,27 @@ def generate_catalog(
 
     logging.info("Generating PDF with %d functional groups, %d drugs", len(funcs), len(drugs))
 
-    # Combine all molecules and legends
-    all_mols = []
-    all_legends = []
-    all_highlight_atoms = []
-    all_highlight_bonds = []
+    all_pages = []
 
     if funcs:
-        all_mols.extend([item["mol"] for item in funcs])
-        all_legends.extend([_format_functional_group_legend(item) for item in funcs])
-        all_highlight_atoms.extend([item["highlight_atoms"] for item in funcs])
-        all_highlight_bonds.extend([item["highlight_bonds"] for item in funcs])
+        all_pages.extend(_render_grouped_pages(
+            funcs, mols_per_row, img_size,
+            legend_fn=_format_functional_group_legend,
+            highlight=True,
+        ))
 
     if drugs:
-        all_mols.extend([item["mol"] for item in drugs])
-        all_legends.extend([item["name"] for item in drugs])
-        all_highlight_atoms.extend([tuple() for _ in drugs])
-        all_highlight_bonds.extend([tuple() for _ in drugs])
+        all_pages.extend(_render_grouped_pages(
+            drugs, mols_per_row, img_size,
+            legend_fn=lambda item: item["name"],
+            highlight=False,
+            section_label="FDA APPROVED DRUGS",
+        ))
 
-    # Generate grid and save directly to PDF
-    logging.info("Rendering %d molecules to PDF...", len(all_mols))
+    logging.info("Rendering %d pages to PDF...", len(all_pages))
+    _save_pages_as_pdf(all_pages, out_pdf)
 
-    grid_img = Draw.MolsToGridImage(
-        all_mols,
-        molsPerRow=mols_per_row,
-        subImgSize=img_size,
-        legends=all_legends,
-        highlightAtomLists=all_highlight_atoms,
-        highlightBondLists=all_highlight_bonds,
-        drawOptions=_catalog_draw_options(),
-        returnPNG=False  # Return PIL Image instead of PNG bytes
-    )
-
-    # Save directly as PDF
-    grid_img.save(str(out_pdf), "PDF", resolution=PDF_RESOLUTION_DPI)
-
-    logging.info("PDF saved: %s (%d molecules)", out_pdf, len(all_mols))
+    logging.info("PDF saved: %s (%d pages)", out_pdf, len(all_pages))
     return out_pdf
 
 
@@ -292,52 +399,35 @@ def generate_catalog_sections(
 
     results = []
 
-    # Functional Groups PDF
+    # Functional Groups PDF — one page per category, each with a header
     if functional_groups:
         funcs = _load_functional_group_examples(yaml_path)
         if funcs:
             logging.info("Rendering %d functional groups...", len(funcs))
-            mols = [item["mol"] for item in funcs]
-            legends = [_format_functional_group_legend(item) for item in funcs]
-            highlight_atoms = [item["highlight_atoms"] for item in funcs]
-            highlight_bonds = [item["highlight_bonds"] for item in funcs]
-
-            grid_img = Draw.MolsToGridImage(
-                mols,
-                molsPerRow=mols_per_row,
-                subImgSize=img_size,
-                legends=legends,
-                highlightAtomLists=highlight_atoms,
-                highlightBondLists=highlight_bonds,
-                drawOptions=_catalog_draw_options(),
-                returnPNG=False
+            pages = _render_grouped_pages(
+                funcs, mols_per_row, img_size,
+                legend_fn=_format_functional_group_legend,
+                highlight=True,
             )
-
             fg_pdf = out_dir / "functional_groups.pdf"
-            grid_img.save(str(fg_pdf), "PDF", resolution=PDF_RESOLUTION_DPI)
-            logging.info("Saved: %s", fg_pdf)
+            _save_pages_as_pdf(pages, fg_pdf)
+            logging.info("Saved: %s (%d pages)", fg_pdf, len(pages))
             results.append(fg_pdf)
 
-    # FDA Approved Drugs PDF
+    # FDA Approved Drugs PDF — single section header
     if fda_approved:
         drugs = _load_approved_drugs(json_path)
         if drugs:
             logging.info("Rendering %d FDA-approved drugs...", len(drugs))
-            mols = [item["mol"] for item in drugs]
-            legends = [item["name"] for item in drugs]
-
-            grid_img = Draw.MolsToGridImage(
-                mols,
-                molsPerRow=mols_per_row,
-                subImgSize=img_size,
-                legends=legends,
-                drawOptions=_catalog_draw_options(),
-                returnPNG=False
+            pages = _render_grouped_pages(
+                drugs, mols_per_row, img_size,
+                legend_fn=lambda item: item["name"],
+                highlight=False,
+                section_label="FDA APPROVED DRUGS",
             )
-
             drugs_pdf = out_dir / "fda_approved_drugs.pdf"
-            grid_img.save(str(drugs_pdf), "PDF", resolution=PDF_RESOLUTION_DPI)
-            logging.info("Saved: %s", drugs_pdf)
+            _save_pages_as_pdf(pages, drugs_pdf)
+            logging.info("Saved: %s (%d pages)", drugs_pdf, len(pages))
             results.append(drugs_pdf)
 
     return results
