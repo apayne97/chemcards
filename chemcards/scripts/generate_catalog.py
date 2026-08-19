@@ -11,6 +11,7 @@ Best for: most catalog generation use cases.
 from pathlib import Path
 import json
 import logging
+from chemcards.database.core import MoleculeDB
 
 try:
     from rdkit import Chem
@@ -24,6 +25,24 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "database" / "data"
 DEFAULT_OUT_DIR = ROOT / "data" / "catalog_output"
+MIN_HEAVY_ATOMS = 5
+MAX_HEAVY_ATOMS = 29
+LIGHT_BLUE_HIGHLIGHT = (68 / 256, 178 / 256, 212 / 256)
+PDF_RESOLUTION_DPI = 300.0
+
+
+def _catalog_draw_options():
+    """Draw options for catalog output with light-blue substructure highlights."""
+    dopts = Draw.rdMolDraw2D.MolDrawOptions()
+    dopts.setHighlightColour(LIGHT_BLUE_HIGHLIGHT)
+    dopts.highlightBondWidthMultiplier = 20
+    return dopts
+
+
+def _format_functional_group_legend(item: dict) -> str:
+    """Build a multiline legend for functional-group example entries."""
+    category = item["category"].replace("_", " ").capitalize()
+    return f"{category}\n{item['name']}\n{item['smarts']}"
 
 
 def _load_functional_groups(yaml_path: Path):
@@ -33,15 +52,101 @@ def _load_functional_groups(yaml_path: Path):
         return []
     with yaml_path.open("r", encoding="utf8") as fh:
         data = yaml.safe_load(fh) or []
+
+    # Keep catalog output stable and grouped: category first, then name.
+    data = sorted(
+        data,
+        key=lambda item: (
+            (item.get("category") or "uncategorized").casefold(),
+            (item.get("name") or "unknown").casefold(),
+        ),
+    )
+
     groups = []
     for item in data:
         name = item.get("name") or "unknown"
+        category = item.get("category") or "uncategorized"
         smarts = item.get("smarts")
         if smarts:
-            mol = Chem.MolFromSmarts(smarts) if Chem else None
-            if mol:
-                groups.append({"name": name, "mol": mol})
+            patt = Chem.MolFromSmarts(smarts) if Chem else None
+            if patt:
+                groups.append(
+                    {
+                        "name": name,
+                        "category": category,
+                        "smarts": smarts,
+                        "pattern": patt,
+                    }
+                )
     return groups
+
+
+def _load_functional_group_examples(yaml_path: Path):
+    """Load one highlighted molecule example per functional group.
+
+    Each entry contains:
+    - name/category
+    - mol: a molecule from MoleculeDB containing the SMARTS pattern
+    - highlight: atom indices for the matched SMARTS substructure
+    """
+    groups = _load_functional_groups(yaml_path)
+    molecule_db = MoleculeDB.load()
+    examples = []
+    missing = 0
+
+    candidate_molecules = []
+    for molecule in molecule_db.molecules:
+        rmol = molecule.to_rdkit()
+        if not rmol:
+            continue
+        heavy_atoms = rmol.GetNumHeavyAtoms()
+        if MIN_HEAVY_ATOMS <= heavy_atoms <= MAX_HEAVY_ATOMS:
+            candidate_molecules.append((molecule, rmol))
+
+    logging.info(
+        "Functional-group example candidates after heavy-atom prefilter (%d-%d): %d",
+        MIN_HEAVY_ATOMS,
+        MAX_HEAVY_ATOMS,
+        len(candidate_molecules),
+    )
+
+    for fg in groups:
+        pattern = fg["pattern"]
+        match_entry = None
+        for molecule, rmol in candidate_molecules:
+            if rmol.HasSubstructMatch(pattern):
+                highlight_atoms = rmol.GetSubstructMatch(pattern)
+                if highlight_atoms:
+                    highlight_bonds = []
+                    for bond in pattern.GetBonds():
+                        begin = highlight_atoms[bond.GetBeginAtomIdx()]
+                        end = highlight_atoms[bond.GetEndAtomIdx()]
+                        match_bond = rmol.GetBondBetweenAtoms(begin, end)
+                        if match_bond is not None:
+                            highlight_bonds.append(match_bond.GetIdx())
+
+                    match_entry = {
+                        "name": fg["name"],
+                        "category": fg["category"],
+                        "smarts": fg["smarts"],
+                        "mol": rmol,
+                        "highlight_atoms": highlight_atoms,
+                        "highlight_bonds": tuple(highlight_bonds),
+                        "example_name": molecule.name,
+                    }
+                    break
+
+        if match_entry is None:
+            missing += 1
+            logging.warning("No example molecule found for functional group: %s", fg["name"])
+            continue
+
+        examples.append(match_entry)
+
+    if missing:
+        logging.info("Skipped %d functional groups with no example match", missing)
+
+    return examples
 
 
 def _load_approved_drugs(json_path: Path):
@@ -66,7 +171,7 @@ def generate_catalog(
     functional_groups: bool = True,
     fda_approved: bool = True,
     mols_per_row: int = 4,
-    img_size: tuple = (250, 250),
+    img_size: tuple = (400, 400),
 ):
     """Generate molecule catalog PDF using RDKit's MolsToGridImage.
 
@@ -91,7 +196,7 @@ def generate_catalog(
     json_path = DATA_DIR / "chembl_approved_drugs.json"
 
     # Load data
-    funcs = _load_functional_groups(yaml_path) if functional_groups else []
+    funcs = _load_functional_group_examples(yaml_path) if functional_groups else []
     drugs = _load_approved_drugs(json_path) if fda_approved else []
 
     if not funcs and not drugs:
@@ -103,14 +208,20 @@ def generate_catalog(
     # Combine all molecules and legends
     all_mols = []
     all_legends = []
+    all_highlight_atoms = []
+    all_highlight_bonds = []
 
     if funcs:
         all_mols.extend([item["mol"] for item in funcs])
-        all_legends.extend([item["name"] for item in funcs])
+        all_legends.extend([_format_functional_group_legend(item) for item in funcs])
+        all_highlight_atoms.extend([item["highlight_atoms"] for item in funcs])
+        all_highlight_bonds.extend([item["highlight_bonds"] for item in funcs])
 
     if drugs:
         all_mols.extend([item["mol"] for item in drugs])
         all_legends.extend([item["name"] for item in drugs])
+        all_highlight_atoms.extend([tuple() for _ in drugs])
+        all_highlight_bonds.extend([tuple() for _ in drugs])
 
     # Generate grid and save directly to PDF
     logging.info("Rendering %d molecules to PDF...", len(all_mols))
@@ -120,11 +231,14 @@ def generate_catalog(
         molsPerRow=mols_per_row,
         subImgSize=img_size,
         legends=all_legends,
+        highlightAtomLists=all_highlight_atoms,
+        highlightBondLists=all_highlight_bonds,
+        drawOptions=_catalog_draw_options(),
         returnPNG=False  # Return PIL Image instead of PNG bytes
     )
 
     # Save directly as PDF
-    grid_img.save(str(out_pdf), "PDF", resolution=100.0)
+    grid_img.save(str(out_pdf), "PDF", resolution=PDF_RESOLUTION_DPI)
 
     logging.info("PDF saved: %s (%d molecules)", out_pdf, len(all_mols))
     return out_pdf
@@ -135,7 +249,7 @@ def generate_catalog_sections(
     functional_groups: bool = True,
     fda_approved: bool = True,
     mols_per_row: int = 4,
-    img_size: tuple = (250, 250),
+    img_size: tuple = (400, 400),
 ):
     """Generate separate PDF files for each section.
 
@@ -167,22 +281,27 @@ def generate_catalog_sections(
 
     # Functional Groups PDF
     if functional_groups:
-        funcs = _load_functional_groups(yaml_path)
+        funcs = _load_functional_group_examples(yaml_path)
         if funcs:
             logging.info("Rendering %d functional groups...", len(funcs))
             mols = [item["mol"] for item in funcs]
-            legends = [item["name"] for item in funcs]
+            legends = [_format_functional_group_legend(item) for item in funcs]
+            highlight_atoms = [item["highlight_atoms"] for item in funcs]
+            highlight_bonds = [item["highlight_bonds"] for item in funcs]
 
             grid_img = Draw.MolsToGridImage(
                 mols,
                 molsPerRow=mols_per_row,
                 subImgSize=img_size,
                 legends=legends,
+                highlightAtomLists=highlight_atoms,
+                highlightBondLists=highlight_bonds,
+                drawOptions=_catalog_draw_options(),
                 returnPNG=False
             )
 
             fg_pdf = out_dir / "functional_groups.pdf"
-            grid_img.save(str(fg_pdf), "PDF", resolution=100.0)
+            grid_img.save(str(fg_pdf), "PDF", resolution=PDF_RESOLUTION_DPI)
             logging.info("Saved: %s", fg_pdf)
             results.append(fg_pdf)
 
@@ -203,7 +322,7 @@ def generate_catalog_sections(
             )
 
             drugs_pdf = out_dir / "fda_approved_drugs.pdf"
-            grid_img.save(str(drugs_pdf), "PDF", resolution=100.0)
+            grid_img.save(str(drugs_pdf), "PDF", resolution=PDF_RESOLUTION_DPI)
             logging.info("Saved: %s", drugs_pdf)
             results.append(drugs_pdf)
 

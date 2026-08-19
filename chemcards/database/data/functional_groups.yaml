@@ -1,21 +1,23 @@
 - name: acid halide
+  category: carbonyl_derivatives
   smarts: "[F,Cl,Br][CX3](=[OX1])[#1,*&!$([OH1])&!$([SH1])]"
 - name: acylimidazole
-  category: imidazole
+  category: heteroaromatic_rings
   smarts:  "[#6][CX3](=[OX1])n1cncc1"
 - name: para-quinone
-  category: quinone
+  category: carbonyl_derivatives
   smarts: "[#6X3]1=,:[#6X3]-,:[#6X3](=[OX1])-,:[#6X3]=,:[#6X3]-,:[#6X3]1(=[OX1])"
 - name: ortho-quinone
-  category: quinone
+  category: carbonyl_derivatives
   smarts: "[#6X3]1(=[OX1])-,:[#6X3](=[OX1])-,:[#6X3]=,:[#6X3]-,:[#6X3]=,:[#6X3]1"
 - name: thiophene
+  category: heteroaromatic_rings
   smarts: "c1ccc[sX2]1"
 - name: 1,2-oxazole
-  category: oxazole
+  category: heteroaromatic_rings
   smarts: "o1nccc1"
 - name: 1,2-thiazole
-  category: thiazole
+  category: heteroaromatic_rings
   smarts: "s1nccc1"
 # gonna comment these out
 #- name: 1,3-oxazole
@@ -28,30 +30,71 @@
 #  category: triazole
 #  smarts: "n1ncnc1"
 - name: 1,2,3-triazole
-  category: triazole
+  category: heteroaromatic_rings
   smarts: "n1nncc1"
 - name: pyridine
+  category: heteroaromatic_rings
   smarts: "n1ccccc1"
 - name: indole
+  category: heteroaromatic_rings
   smarts: "c1ccc2nccc2c1"
 - name: phenothiazine
+  category: heteroaromatic_rings
   smarts: "*-[#7]-1-c2ccccc2-[#16]-c2ccccc-12"
 - name: acyl hydrazine
+  category: nitrogen_functionalities
   smarts: "[N;R0][N;R0]C(=O)"
 - name: imine
+  category: nitrogen_functionalities
   smarts: "[#1,#6][CX3](=[NX2][#1,#6&!$([CX3]=[OX1,SX1,NX2])])[#1,#6]"
 - name: acid anhydride
+  category: carbonyl_derivatives
   smarts: "[CX3](=[OX1])[OX2][CX3](=[OX1])"
 - name: beta-keto anhydride
+  category: carbonyl_derivatives
   smarts: "[C,c](=O)[CX4,CR0X3,O][C,c](=O)"
 - name: beta-lactam
+  category: carbonyl_derivatives
   smarts: "[NX3]1[CX4][CX4][CX3]1(=[OX1])"
 - name: morpholine
+  category: nitrogen_functionalities
   smarts: "O1CC[NH1]CC1"
 - name: phenyl acetamide
+  category: carbonyl_derivatives
   smarts: "CC(=O)NC1=CC=CC=C1"
 - name: sulfonamide
+  category: sulfur_functionalities
   smarts: "CS(=O)(=O)N"
-#  smarts: "[#16X4]([NX3])(=[OX1])(=[OX1])[#6]"
-#  smarts: "[S&D5](=O)(=O)[N]"
-#  smarts: "[$([#16X4]([NX3])(=[OX1])(=[OX1])[#6]),$([#16X4+2]([NX3])([OX1-])([OX1-])[#6])]"
+- name: methyl
+  category: hydrocarbon
+  smarts: "[CH3X4]"
+- name: ethyl
+  category: hydrocarbon
+  smarts: "[CH2X4][CH3X4]"
+- name: ketone
+  category: carbonyl_derivatives
+  smarts: "[#6][CX3](=[OX1])[#6]"
+- name: alcohol
+  category: oxygen_functionalities
+  smarts: "[CX4][OX2H]"
+- name: amine
+  category: nitrogen_functionalities
+  smarts: "[NX3;H2,H1;!$(NC=O)]"
+- name: ether
+  category: oxygen_functionalities
+  smarts: "[OD2]([#6])[#6]"
+- name: ester
+  category: carbonyl_derivatives
+  smarts: "[#6][CX3](=[OX1])[OX2][#6]"
+- name: amide
+  category: carbonyl_derivatives
+  smarts: "[#6][CX3](=[OX1])[NX3]"
+- name: carboxylic acid
+  category: carbonyl_derivatives
+  smarts: "[#6][CX3](=[OX1])[OX2H1]"
+- name: alkyl halide
+  category: halogenated
+  smarts: "[CX4][F,Cl,Br,I]"
+- name: aryl halide
+  category: halogenated
+  smarts: "[c][F,Cl,Br,I]"
