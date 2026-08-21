@@ -60,7 +60,7 @@ def _catalog_draw_options():
 
 def _format_functional_group_legend(item: dict) -> str:
     """Build a legend for functional-group example entries (name + smarts only; category is a page header)."""
-    return f"{item['name']}\n{item['smarts']}"
+    return f"{item['example_name']}\n{item['name']}\n{item['smarts']}"
 
 
 def _make_header_image(label: str, width: int) -> "Image.Image":
