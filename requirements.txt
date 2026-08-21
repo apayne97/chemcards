@@ -4,5 +4,6 @@ pydantic
 pyyaml
 pillow
 tqdm
+plotly
 chembl-webresource-client
 -e .
