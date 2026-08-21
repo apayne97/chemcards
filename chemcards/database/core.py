@@ -14,6 +14,7 @@ class MoleculeEntry(BaseModel):
     action_type: str = Field("unknown")
     molecule_chembl_id: str = Field("unknown")
     target_chembl_id: str = Field("unknown")
+    atc_classifications: list[str] = Field(default_factory=list)
 
     def to_rdkit(self) -> Mol:
         return MolFromSmiles(self.smiles)
@@ -21,14 +22,16 @@ class MoleculeEntry(BaseModel):
 
 class MoleculeDB(BaseModel):
     molecules: list[MoleculeEntry]
+    last_updated: str | None = None
 
     def update(self, other: "MoleculeDB") -> "MoleculeDB":
-
         self_molecules = {molecule.name: molecule for molecule in self.molecules}
         other_molecules = {molecule.name: molecule for molecule in other.molecules}
         self_molecules.update(other_molecules)
-
-        return MoleculeDB(molecules=list(self_molecules.values()))
+        return MoleculeDB(
+            molecules=list(self_molecules.values()),
+            last_updated=self.last_updated,
+        )
 
     @classmethod
     def load(cls) -> "MoleculeDB":

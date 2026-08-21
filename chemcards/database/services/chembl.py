@@ -79,6 +79,7 @@ class ChemblMoleculeEntry(MoleculeEntry):
 
             target = entry.get("usan_stem_definition") or "unknown"
             molecule_chembl_id = entry.get("molecule_chembl_id") or "unknown"
+            atc_classifications = entry.get("atc_classifications") or []
 
             return cls(
                 name=name,
@@ -86,6 +87,7 @@ class ChemblMoleculeEntry(MoleculeEntry):
                 target=target,
                 molecule_chembl_id=molecule_chembl_id,
                 target_chembl_id="unknown",
+                atc_classifications=atc_classifications,
             )
         except Exception as e:
             logger.debug("Failed to parse ChemBL molecule entry: %s", e)
@@ -217,6 +219,7 @@ class ChemblDB(MoleculeDB):
                         target_chembl_id=loaded_mechanism.target_chembl_id,
                         mechanism_of_action=loaded_mechanism.mechanism_of_action,
                         action_type=loaded_mechanism.action_type,
+                        atc_classifications=molecule.atc_classifications,
                     )
                 )
             except Exception as e:
@@ -234,6 +237,7 @@ class ChemblDB(MoleculeDB):
 
 
 def main():
+    from datetime import datetime, timezone
 
     if not CHEMBL_DOWNLOAD.exists():
         print("Downloading Chembl Molecule Data")
@@ -243,13 +247,10 @@ def main():
         print("Downloading Chembl Mechanism Data")
         download_drug_mechanisms()
 
-    # if not CHEMBL_TARGET_DOWNLOAD.exists():
-    #     print("Downloading Chembl Target Data")
-    #     download_drug_targets()
-
     mydb = ChemblDB.from_download()
     mydb = ChemblDB.from_mechanism()
     mydb.remove_duplicates()
+    mydb.last_updated = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     mydb.save()
 
 
