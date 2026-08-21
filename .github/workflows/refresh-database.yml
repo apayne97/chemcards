@@ -1,0 +1,40 @@
+name: Refresh ChEMBL Database
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # First of every month at midnight UTC
+  workflow_dispatch:       # Allow manual trigger from GitHub UI
+
+jobs:
+  refresh-database:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # Needed to push updated molecule_database.json
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Remove stale database to force a clean refresh
+        run: |
+          rm -f chemcards/database/data/molecule_database.json
+          rm -f chemcards/database/data/chembl_approved_drugs.json
+          rm -f chemcards/database/data/chembl_mechanism_approved_drugs.json
+
+      - name: Download and regenerate database
+        run: chemcards download-database
+
+      - name: Commit and push updated database
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add chemcards/database/data/molecule_database.json
+          git diff --cached --quiet || git commit -m "chore: refresh ChEMBL database [skip ci]"
+          git push
