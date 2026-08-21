@@ -1,6 +1,6 @@
 import streamlit as st
-from rdkit.Chem import Draw, MolFromSmiles, MolFromSmarts
-from PIL import Image
+from rdkit.Chem import MolFromSmiles, MolFromSmarts
+from rdkit.Chem.Draw import rdMolDraw2D
 
 from chemcards.database.core import MoleculeDB, MoleculeEntry
 from chemcards.database.cheminformatics import FunctionalGroup
@@ -34,18 +34,21 @@ def load_filtered_db() -> MoleculeDB:
     return db
 
 
-def render_smiles(smiles: str, size: tuple[int, int] = (300, 300)) -> Image.Image | None:
-    mol = MolFromSmiles(smiles)
+def _draw_mol(mol, size: int) -> bytes | None:
     if mol is None:
         return None
-    return Draw.MolToImage(mol, size=size)
+    d = rdMolDraw2D.MolDraw2DCairo(size, size)
+    rdMolDraw2D.PrepareAndDrawMolecule(d, mol)
+    d.FinishDrawing()
+    return d.GetDrawingText()
 
 
-def render_smarts(smarts: str, size: tuple[int, int] = (300, 300)) -> Image.Image | None:
-    mol = MolFromSmarts(smarts)
-    if mol is None:
-        return None
-    return Draw.MolToImage(mol, size=size)
+def render_smiles(smiles: str, size: int = 300) -> bytes | None:
+    return _draw_mol(MolFromSmiles(smiles), size)
+
+
+def render_smarts(smarts: str, size: int = 300) -> bytes | None:
+    return _draw_mol(MolFromSmarts(smarts), size)
 
 
 def init_state() -> None:
@@ -114,7 +117,7 @@ def show_quiz() -> None:
         grid = [top_cols[0], top_cols[1], bot_cols[0], bot_cols[1]]
         for mol_entry, col, label in zip(q.choices, grid, labels):
             with col:
-                img = render_smiles(mol_entry.smiles, size=(250, 250))
+                img = render_smiles(mol_entry.smiles, size=250)
                 if img:
                     st.image(img, caption=label)
 
