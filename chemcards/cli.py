@@ -1,4 +1,3 @@
-from chemcards.gui.mainwindow import MainWindow
 import click
 
 # Define the main command group
@@ -9,6 +8,7 @@ def cli():
 
 @cli.command("start")
 def start():
+    from chemcards.gui.mainwindow import MainWindow
     main_window = MainWindow()
     main_window.start()
 

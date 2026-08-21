@@ -162,3 +162,4 @@ cython_debug/
 .idea/
 temp/
 *.json
+!chemcards/database/data/molecule_database.json
