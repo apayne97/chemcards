@@ -1,0 +1,8 @@
+streamlit
+rdkit
+pydantic
+pyyaml
+pillow
+tqdm
+chembl-webresource-client
+-e .
