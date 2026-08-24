@@ -59,6 +59,7 @@ def _add_polar_hs(mol: Chem.Mol) -> Chem.Mol:
     )
     for idx in to_remove:
         rw.RemoveAtom(idx)
+    Chem.SanitizeMol(rw)
     return rw.GetMol()
 
 

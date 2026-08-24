@@ -18,24 +18,6 @@
   category: sulfur_heteroaromatic
   smarts: "c1ccc[sX2]1"
   display_smiles: "c1cccs1"
-- name: 1,2-oxazole
-  category: multiple_heteroatom_heteroaromatic
-  smarts: "o1nccc1"
-  display_smiles: "c1ccno1"
-- name: 1,2-thiazole
-  category: multiple_heteroatom_heteroaromatic
-  smarts: "s1nccc1"
-  display_smiles: "c1ccns1"
-# gonna comment these out
-#- name: 1,3-oxazole
-#  category: oxazole
-#  smarts: "o1cncc1"
-#- name: 1,3-thiazole
-#  category: thiazole
-#  smarts: "s1cncc1"
-#- name: 1,2,4-triazole
-#  category: triazole
-#  smarts: "n1ncnc1"
 - name: furan
   category: oxygen_heteroaromatic
   smarts: "o1cccc1"
@@ -52,9 +34,9 @@
   category: nitrogen_heteroaromatic
   smarts: "c1cc[nH]n1"
   display_smiles: "c1cc[nH]n1"
-- name: 1,2,4-triazole
+- name: triazole
   category: nitrogen_heteroaromatic
-  smarts: "n1ncnc1"
+  smarts: "[$(n1ncnc1),$(n1nncc1)]"
   display_smiles: "c1nc[nH]n1"
 - name: pyrimidine
   category: nitrogen_heteroaromatic
@@ -68,18 +50,14 @@
   category: nitrogen_heteroaromatic
   smarts: "n1ccncc1"
   display_smiles: "c1cnccn1"
-- name: 1,3-oxazole
+- name: oxazole
   category: multiple_heteroatom_heteroaromatic
-  smarts: "o1cncc1"
+  smarts: "[$(o1cncc1),$(o1nccc1)]"
   display_smiles: "c1cnco1"
-- name: 1,3-thiazole
+- name: thiazole
   category: multiple_heteroatom_heteroaromatic
-  smarts: "s1cncc1"
+  smarts: "[$(s1cncc1),$(s1nccc1)]"
   display_smiles: "c1cncs1"
-- name: 1,2,3-triazole
-  category: nitrogen_heteroaromatic
-  smarts: "n1nncc1"
-  display_smiles: "c1cn[nH]n1"
 - name: pyridine
   category: nitrogen_heteroaromatic
   smarts: "n1ccccc1"
@@ -198,5 +176,5 @@
   display_smiles: "C1COCCC1"
 - name: dioxane
   category: oxygen_heteroaromatic
-  smarts: "O1CCOCC1,O1COCCC1"
+  smarts: "[$(O1CCOCC1),$(O1COCCC1)]"
   display_smiles: "C1COCOC1"
