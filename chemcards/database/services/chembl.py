@@ -236,22 +236,40 @@ class ChemblDB(MoleculeDB):
         return cls(molecules=converted_molecules)
 
 
-def main():
+def download_raw_data(force: bool = False) -> None:
+    """Download raw ChEMBL molecule and mechanism data to local JSON files.
+
+    Skips files that already exist unless force=True.
+    """
+    if force or not CHEMBL_DOWNLOAD.exists():
+        logger.info("Downloading ChEMBL molecule data...")
+        download_drug_molecules()
+    else:
+        logger.info("ChEMBL molecule data already cached, skipping download.")
+
+    if force or not CHEMBL_MECHANISM_DOWNLOAD.exists():
+        logger.info("Downloading ChEMBL mechanism data...")
+        download_drug_mechanisms()
+    else:
+        logger.info("ChEMBL mechanism data already cached, skipping download.")
+
+
+def build_molecule_database() -> None:
+    """Build molecule_database.json from cached raw ChEMBL files."""
     from datetime import datetime, timezone
 
-    if not CHEMBL_DOWNLOAD.exists():
-        print("Downloading Chembl Molecule Data")
-        download_drug_molecules()
-
-    if not CHEMBL_MECHANISM_DOWNLOAD.exists():
-        print("Downloading Chembl Mechanism Data")
-        download_drug_mechanisms()
-
+    logger.info("Building molecule database...")
     mydb = ChemblDB.from_download()
     mydb = ChemblDB.from_mechanism()
     mydb.remove_duplicates()
     mydb.last_updated = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     mydb.save()
+    logger.info("Done. %d molecules written to database.", len(mydb.molecules))
+
+
+def main():
+    download_raw_data()
+    build_molecule_database()
 
 
 if __name__ == "__main__":

@@ -22,14 +22,8 @@ jobs:
       - name: Install dependencies
         run: pip install -e .
 
-      - name: Remove stale database to force a clean refresh
-        run: |
-          rm -f chemcards/database/data/molecule_database.json
-          rm -f chemcards/database/data/chembl_approved_drugs.json
-          rm -f chemcards/database/data/chembl_mechanism_approved_drugs.json
-
       - name: Download and regenerate database
-        run: chemcards download-database
+        run: chemcards update-database --force
 
       - name: Commit and push updated database
         run: |
