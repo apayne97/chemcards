@@ -76,7 +76,7 @@ stats = compute_stats()
 
 col_logo, col_title = st.columns([1, 4])
 with col_logo:
-    st.image("assets/chemcards-logo.png", use_container_width=True)
+    st.image("assets/chemcards-logo.png", width="stretch")
 with col_title:
     st.title("ChemCards")
     st.markdown(
@@ -124,7 +124,7 @@ fig.update_layout(
     xaxis_title="Number of molecules",
     height=max(300, len(df) * 22),
 )
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
 
 st.divider()
 

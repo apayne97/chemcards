@@ -1,11 +1,21 @@
+"""MedChemble — Wordle-style functional group identification game.
+
+The player is shown a mystery functional group (as a SMARTS pattern) and must
+name it.  Each guess is matched to the closest functional group in the
+database; five structural properties are shown as green / grey tiles:
+category, aromaticity, and presence of N / O / S.
+"""
+import datetime
 import difflib
 import random
 import streamlit as st
-from collections import Counter
+from rdkit import Chem
 
 from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, FunctionalGroup
-from chemcards.flashcards.multiplechoice import MultipleChoice
 from utils import render_smarts
+
+MAX_GUESSES = 6
+P = "fgwordle_"
 
 CATEGORY_LABELS = {
     "amide_derivatives": "Amide derivatives",
@@ -21,7 +31,13 @@ CATEGORY_LABELS = {
     "sulfur_heteroaromatic": "Sulfur heteroaromatics",
 }
 
-P = "medchemble_"
+TILE_DEFS = [
+    ("category", "Category"),
+    ("is_aromatic", "Aromatic"),
+    ("has_nitrogen", "Nitrogen"),
+    ("has_oxygen", "Oxygen"),
+    ("has_sulfur", "Sulfur"),
+]
 
 
 def _k(key):
@@ -32,26 +48,17 @@ def _norm(s: str) -> str:
     return "".join(s.lower().split()).replace("-", "").replace(",", "")
 
 
+def _date_seed() -> int:
+    return int(datetime.date.today().strftime("%Y%m%d"))
+
+
 def _all_categories() -> list[str]:
     return sorted({fg.category for fg in FUNCTIONAL_GROUPS if fg.category})
 
 
 def _counts_by_category() -> dict[str, int]:
+    from collections import Counter
     return Counter(fg.category for fg in FUNCTIONAL_GROUPS if fg.category)
-
-
-def init_state():
-    for key, val in {
-        "mode": "menu",
-        "current_question": None,
-        "score": 0,
-        "total": 0,
-        "answered": False,
-        "correct_last": None,
-    }.items():
-        st.session_state.setdefault(_k(key), val)
-    for cat in _all_categories():
-        st.session_state.setdefault(_k(f"cat_{cat}"), True)
 
 
 def build_filtered_fgs() -> list[FunctionalGroup]:
@@ -61,43 +68,81 @@ def build_filtered_fgs() -> list[FunctionalGroup]:
     ]
 
 
-def next_question(filtered_fgs: list[FunctionalGroup]) -> MultipleChoice:
-    sample_count = min(4, len(filtered_fgs))
-    examples = random.sample(filtered_fgs, sample_count)
-    correct = random.randrange(sample_count)
-    return MultipleChoice(
-        question="What is the name of this functional group?",
-        display=examples[correct],
-        choices=[fg.name for fg in examples],
-        answer_index=correct,
-        answer_molecule=None,
-    )
+def fg_properties(fg: FunctionalGroup) -> dict:
+    mol = Chem.MolFromSmarts(fg.smarts)
+    atoms = [a.GetAtomicNum() for a in mol.GetAtoms() if a.GetAtomicNum() > 0] if mol else []
+    aromatic = any(a.GetIsAromatic() for a in mol.GetAtoms()) if mol else False
+    return {
+        "category": fg.category,
+        "is_aromatic": aromatic,
+        "has_nitrogen": 7 in atoms,
+        "has_oxygen": 8 in atoms,
+        "has_sulfur": 16 in atoms,
+    }
 
 
-def start_quiz():
-    filtered = build_filtered_fgs()
-    if len(filtered) < 4:
-        st.error("Need at least 4 functional groups — select more categories.")
+def find_fg(query: str, pool: list[FunctionalGroup]) -> FunctionalGroup | None:
+    q_norm = _norm(query)
+    best_ratio, best_fg = 0.0, None
+    for fg in pool:
+        ratio = difflib.SequenceMatcher(None, q_norm, _norm(fg.name)).ratio()
+        if ratio > best_ratio:
+            best_ratio, best_fg = ratio, fg
+    return best_fg if best_ratio >= 0.5 else None
+
+
+def compare_fg(guess_fg: FunctionalGroup, target_fg: FunctionalGroup) -> list[dict]:
+    gp = fg_properties(guess_fg)
+    tp = fg_properties(target_fg)
+    results = []
+    for prop, label in TILE_DEFS:
+        g_val = gp.get(prop)
+        t_val = tp.get(prop)
+        match = g_val == t_val
+        if prop == "category":
+            display = CATEGORY_LABELS.get(g_val, str(g_val)) if g_val else "—"
+        else:
+            display = "Yes" if g_val else "No"
+        results.append({"level": label, "match": match, "label": display})
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Session state
+# ---------------------------------------------------------------------------
+def init_state():
+    for key, val in {
+        "target": None,
+        "guesses": [],
+        "game_status": "idle",
+        "is_daily": False,
+    }.items():
+        st.session_state.setdefault(_k(key), val)
+    for cat in _all_categories():
+        st.session_state.setdefault(_k(f"cat_{cat}"), True)
+
+
+def daily_game():
+    full_pool = [fg for fg in FUNCTIONAL_GROUPS if fg.category]
+    if not full_pool:
+        st.error("No functional groups available.")
         return
-    q = next_question(filtered)
-    st.session_state[_k("current_question")] = q
-    st.session_state[_k("filtered_fgs")] = filtered
-    st.session_state[_k("score")] = 0
-    st.session_state[_k("total")] = 0
-    st.session_state[_k("answered")] = False
-    st.session_state[_k("correct_last")] = None
-    st.session_state[_k("mode")] = "quiz"
+    target = random.Random(_date_seed()).choice(full_pool)
+    st.session_state[_k("target")] = target
+    st.session_state[_k("guesses")] = []
+    st.session_state[_k("game_status")] = "playing"
+    st.session_state[_k("is_daily")] = True
 
 
-def reset_to_menu():
-    for key in ("current_question", "filtered_fgs"):
-        st.session_state[_k(key)] = None
-    for key in ("score", "total"):
-        st.session_state[_k(key)] = 0
-    for key in ("answered", "correct_last"):
-        st.session_state[_k(key)] = False
-    st.session_state[_k("mode")] = "menu"
-    st.rerun()
+def new_game():
+    pool = build_filtered_fgs()
+    if len(pool) < 2:
+        st.error("Need at least 2 functional groups — select more categories.")
+        return
+    st.session_state[_k("target")] = random.choice(pool)
+    st.session_state[_k("guesses")] = []
+    st.session_state[_k("game_status")] = "playing"
+    st.session_state[_k("is_daily")] = False
 
 
 # ---------------------------------------------------------------------------
@@ -106,9 +151,10 @@ def reset_to_menu():
 def show_sidebar():
     cats = _all_categories()
     counts = _counts_by_category()
-    mode = st.session_state[_k("mode")]
-
     with st.sidebar:
+        st.button("📅 Today's Functional Group", type="primary", use_container_width=True, on_click=daily_game)
+        st.button("🎲 Random Functional Group", use_container_width=True, on_click=new_game)
+        st.divider()
         st.markdown("### 🔬 Functional Group Categories")
         c1, c2 = st.columns(2)
         if c1.button("All", key=_k("btn_all"), use_container_width=True):
@@ -119,160 +165,124 @@ def show_sidebar():
             for cat in cats:
                 st.session_state[_k(f"cat_{cat}")] = False
             st.rerun()
-
         for cat in cats:
             label = CATEGORY_LABELS.get(cat, cat.replace("_", " ").title())
             st.checkbox(f"{label} ({counts[cat]})", key=_k(f"cat_{cat}"))
-
-        st.radio("Answer mode", ["Multiple choice", "Type answer"], key=_k("answer_mode"))
         st.divider()
-
         pool_size = len(build_filtered_fgs())
-        st.caption(f"{pool_size} functional groups selected")
-
-        if mode == "menu":
-            st.button(
-                "▶ Start Quiz",
-                type="primary",
-                use_container_width=True,
-                disabled=pool_size < 4,
-                on_click=start_quiz,
-            )
-        else:
-            if st.button("⏹ New Quiz", use_container_width=True):
-                reset_to_menu()
+        st.caption(f"{pool_size} functional groups in random pool")
 
 
 # ---------------------------------------------------------------------------
-# Main area: menu
+# Tile rendering
 # ---------------------------------------------------------------------------
-def show_menu():
-    st.title("⚗️ FG Quiz")
-    st.markdown(
-        "Test your knowledge of medicinal chemistry functional groups. "
-        "Use the sidebar to filter by category, then hit **Start Quiz**."
-    )
-    st.divider()
-    st.markdown(
-        "You'll be shown a SMARTS pattern and asked to identify the functional group by name."
+def _tile_html(label: str, match: bool, level: str) -> str:
+    bg = "#538d4e" if match else "#3a3a3c"
+    return (
+        f"<div style='background:{bg};color:white;border-radius:6px;padding:8px 6px;"
+        f"text-align:center;margin:2px;min-height:60px;display:flex;"
+        f"flex-direction:column;justify-content:center;'>"
+        f"<div style='font-size:0.65em;opacity:0.75;margin-bottom:2px;'>{level}</div>"
+        f"<div style='font-size:0.8em;font-weight:600;'>{label}</div>"
+        f"</div>"
     )
 
 
-# ---------------------------------------------------------------------------
-# Main area: quiz
-# ---------------------------------------------------------------------------
-def show_quiz():
-    q: MultipleChoice = st.session_state[_k("current_question")]
-    filtered_fgs: list[FunctionalGroup] = st.session_state[_k("filtered_fgs")]
-    score = st.session_state[_k("score")]
-    total = st.session_state[_k("total")]
-    answered = st.session_state[_k("answered")]
+def render_guess_row(guess_dict: dict):
+    fg: FunctionalGroup = guess_dict["fg"]
+    comparison: list[dict] = guess_dict["comparison"]
+    exact: bool = guess_dict["exact"]
+    label = f"**{fg.name}**" + (" ✓" if exact else "")
+    st.markdown(label)
+    cols = st.columns(5)
+    for col, result in zip(cols, comparison):
+        col.markdown(_tile_html(result["label"], result["match"], result["level"]),
+                     unsafe_allow_html=True)
+    st.markdown("")
 
-    col_title, col_score, col_end = st.columns([4, 1, 1])
-    with col_title:
-        st.subheader("Functional Group → Name")
-    with col_score:
-        st.metric("Score", f"{score}/{total}")
-    with col_end:
-        if st.button("End"):
-            st.session_state[_k("mode")] = "result"
-            st.rerun()
 
+# ---------------------------------------------------------------------------
+# Main game area
+# ---------------------------------------------------------------------------
+def show_idle():
+    st.title("⚗️ MedChemble")
+    st.markdown(
+        "A Wordle-style functional group identification game. A mystery SMARTS pattern is shown — "
+        "guess the functional group name. Each guess shows five structural properties as "
+        "green (match) or grey (no match) tiles: **Category**, **Aromatic**, **N**, **O**, **S**."
+    )
+    st.divider()
+    col1, col2 = st.columns(2)
+    with col1:
+        st.button("📅 Today's Functional Group", type="primary", use_container_width=True, on_click=daily_game)
+    with col2:
+        st.button("🎲 Random Functional Group", use_container_width=True, on_click=new_game)
+
+
+def show_game():
+    target: FunctionalGroup = st.session_state[_k("target")]
+    guesses: list[dict] = st.session_state[_k("guesses")]
+    status: str = st.session_state[_k("game_status")]
+    is_daily: bool = st.session_state.get(_k("is_daily"), False)
+    n_guesses = len(guesses)
+    all_fgs = FUNCTIONAL_GROUPS
+
+    title_suffix = " · 📅 Daily" if is_daily else ""
+    st.title(f"⚗️ MedChemble{title_suffix}")
+    st.caption(f"Guess {n_guesses}/{MAX_GUESSES} · Identify the functional group")
     st.divider()
 
-    if isinstance(q.display, FunctionalGroup):
-        img = render_smarts(q.display.smarts, size=300)
+    img = render_smarts(target.smarts, size=300)
+    col_img, col_game = st.columns([1, 1])
+    with col_img:
         if img:
-            col_img, _ = st.columns([1, 2])
-            with col_img:
-                st.image(img)
+            st.image(img)
 
-    st.subheader(q.question)
+    with col_game:
+        for g in guesses:
+            render_guess_row(g)
 
-    answer_mode = st.session_state.get(_k("answer_mode"), "Multiple choice")
-    text_mode = answer_mode == "Type answer"
-    correct_name = q.choices[q.answer_index]
+        if status == "playing":
+            with st.form(key=_k(f"guess_form_{n_guesses}"), clear_on_submit=True):
+                guess_input = st.text_input("Functional group name:",
+                                            placeholder="e.g. indole")
+                submitted = st.form_submit_button("Guess", type="primary",
+                                                  use_container_width=True)
+            if submitted and guess_input.strip():
+                matched = find_fg(guess_input.strip(), all_fgs)
+                if matched is None:
+                    st.warning("No matching functional group found.")
+                else:
+                    comparison = compare_fg(matched, target)
+                    exact = _norm(matched.name) == _norm(target.name)
+                    guesses.append({"input": guess_input, "fg": matched,
+                                    "comparison": comparison, "exact": exact})
+                    if exact:
+                        st.session_state[_k("game_status")] = "won"
+                    elif len(guesses) >= MAX_GUESSES:
+                        st.session_state[_k("game_status")] = "lost"
+                    st.rerun()
 
-    if text_mode:
-        with st.form(key=_k(f"text_form_{total}"), clear_on_submit=False):
-            guess = st.text_input("Type the functional group name:", disabled=answered)
-            submitted = st.form_submit_button("Check", type="primary",
-                                              use_container_width=True, disabled=answered)
-        if submitted and guess.strip() and not answered:
-            ratio = difflib.SequenceMatcher(None, _norm(guess), _norm(correct_name)).ratio()
-            if _norm(guess) == _norm(correct_name):
-                st.session_state[_k("answered")] = True
-                st.session_state[_k("total")] += 1
-                st.session_state[_k("correct_last")] = True
-                st.session_state[_k("score")] += 1
+            if st.button("Give Up", use_container_width=True):
+                st.session_state[_k("game_status")] = "lost"
                 st.rerun()
-            elif ratio > 0.8:
-                st.warning("So close — check your spelling and try again.")
-            else:
-                st.error("Not quite. Try again or reveal the answer.")
-    else:
-        radio_key = _k(f"radio_{total}")
-        radio_val = st.radio("Your answer:", q.choices, index=None, key=radio_key, disabled=answered)
-        selected_idx = q.choices.index(radio_val) if radio_val else None
 
-    st.divider()
+        elif status == "won":
+            st.success(f"🎉 Correct! The functional group was **{target.name}**.")
+            _show_answer_details(target)
+            st.button("🎲 New Random Functional Group", type="primary", use_container_width=True, on_click=new_game)
 
-    if not answered:
-        if text_mode:
-            if st.button("Reveal answer / I don't know", use_container_width=True):
-                st.session_state[_k("answered")] = True
-                st.session_state[_k("total")] += 1
-                st.session_state[_k("correct_last")] = False
-                st.rerun()
-        else:
-            if st.button("Check Answer", disabled=(radio_val is None), type="primary"):
-                st.session_state[_k("answered")] = True
-                st.session_state[_k("total")] += 1
-                correct = selected_idx == q.answer_index
-                st.session_state[_k("correct_last")] = correct
-                if correct:
-                    st.session_state[_k("score")] += 1
-                st.rerun()
-    else:
-        if st.session_state[_k("correct_last")]:
-            st.success("Correct!")
-        else:
-            st.error(f"The answer was: **{correct_name}**")
-
-        if isinstance(q.display, FunctionalGroup):
-            with st.expander("Functional group details"):
-                fg = q.display
-                label = CATEGORY_LABELS.get(fg.category, fg.category.replace("_", " ").title()) if fg.category else "—"
-                st.markdown(f"**Name:** {fg.name}")
-                st.markdown(f"**Category:** {label}")
-                st.code(fg.smarts, language=None)
-
-        if st.button("Next Question", type="primary"):
-            st.session_state[_k("current_question")] = next_question(filtered_fgs)
-            st.session_state[_k("answered")] = False
-            st.session_state[_k("correct_last")] = None
-            st.rerun()
+        elif status == "lost":
+            st.error(f"The functional group was **{target.name}**.")
+            _show_answer_details(target)
+            st.button("🎲 New Random Functional Group", type="primary", use_container_width=True, on_click=new_game)
 
 
-# ---------------------------------------------------------------------------
-# Main area: result
-# ---------------------------------------------------------------------------
-def show_result():
-    st.title("Quiz Complete!")
-    score = st.session_state[_k("score")]
-    total = st.session_state[_k("total")]
-    pct = round(100 * score / total) if total > 0 else 0
-    st.metric("Final Score", f"{score}/{total}", f"{pct}%")
-
-    if pct >= 80:
-        st.success("Great job!")
-    elif pct >= 50:
-        st.info("Good effort — keep practicing.")
-    else:
-        st.warning("Keep studying — you'll get there!")
-
-    if st.button("Back to Menu", type="primary"):
-        reset_to_menu()
+def _show_answer_details(fg: FunctionalGroup):
+    with st.expander("Details"):
+        cat_label = CATEGORY_LABELS.get(fg.category, fg.category or "—") if fg.category else "—"
+        st.markdown(f"**Category:** {cat_label}")
+        st.code(fg.smarts, language=None)
 
 
 # ---------------------------------------------------------------------------
@@ -281,10 +291,8 @@ def show_result():
 init_state()
 show_sidebar()
 
-mode = st.session_state[_k("mode")]
-if mode == "menu":
-    show_menu()
-elif mode == "quiz":
-    show_quiz()
-elif mode == "result":
-    show_result()
+status = st.session_state[_k("game_status")]
+if status == "idle":
+    show_idle()
+else:
+    show_game()
