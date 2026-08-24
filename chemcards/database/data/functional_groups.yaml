@@ -102,6 +102,18 @@
   category: sulfur_functionalities
   smarts: "CS(=O)(=O)N"
   display_smiles: "[*:1]S(=O)(=O)N"
+- name: alkane
+  category: hydrocarbon
+  smarts: "[CX4][CX4]"
+  display_smiles: "[*:1]CC[*:2]"
+- name: alkene
+  category: hydrocarbon
+  smarts: "[CX3]=[CX3]"
+  display_smiles: "[*:1]C=C[*:2]"
+- name: alkyne
+  category: hydrocarbon
+  smarts: "[CX2]#[CX2]"
+  display_smiles: "[*:1]C#C[*:2]"
 - name: methyl
   category: hydrocarbon
   smarts: "[CH3X4]"
