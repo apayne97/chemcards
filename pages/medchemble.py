@@ -87,7 +87,6 @@ def start_quiz():
     st.session_state[_k("answered")] = False
     st.session_state[_k("correct_last")] = None
     st.session_state[_k("mode")] = "quiz"
-    st.rerun()
 
 
 def reset_to_menu():

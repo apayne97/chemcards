@@ -124,7 +124,6 @@ def new_game():
     st.session_state[_k("target")] = random.choice(pool)
     st.session_state[_k("guesses")] = []
     st.session_state[_k("game_status")] = "playing"
-    st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +235,10 @@ def show_game():
                     elif len(guesses) >= MAX_GUESSES:
                         st.session_state[_k("game_status")] = "lost"
                     st.rerun()
+
+            if st.button("Give Up", use_container_width=True):
+                st.session_state[_k("game_status")] = "lost"
+                st.rerun()
 
         elif status == "won":
             st.success(f"🎉 Correct! The functional group was **{target.name}**.")
