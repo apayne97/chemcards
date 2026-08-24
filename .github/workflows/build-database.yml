@@ -1,0 +1,61 @@
+name: Rebuild Database on Push
+
+# Rebuilds molecule_database.json from cached raw ChEMBL data whenever
+# database processing logic changes. Requires the monthly refresh to have
+# run at least once (to populate the cache). No API calls are made here.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'chemcards/database/**'
+      - 'pyproject.toml'
+
+jobs:
+  build-database:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get month for cache key
+        id: date
+        run: echo "month=$(date +'%Y-%m')" >> $GITHUB_OUTPUT
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      # Restore-only: never writes a new cache entry (that's the monthly job's job).
+      # Falls back to any previous month's cache via the chembl- prefix.
+      - name: Restore ChEMBL raw data cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            chemcards/database/data/chembl_approved_drugs.json
+            chemcards/database/data/chembl_mechanism_approved_drugs.json
+            chemcards/database/data/chembl_target_approved_drugs.json
+          key: chembl-${{ steps.date.outputs.month }}
+          restore-keys: chembl-
+
+      # Only rebuild if raw data was found in cache. Without raw files the
+      # update-database command would fall back to downloading, which we don't
+      # want on every push.
+      - name: Rebuild database from cache
+        if: steps.cache.outputs.cache-matched-key != ''
+        run: chemcards update-database
+
+      - name: Commit if changed
+        if: steps.cache.outputs.cache-matched-key != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add chemcards/database/data/molecule_database.json chemcards/database/data/chembl_atc_classes.json
+          git diff --cached --quiet || git commit -m "chore: rebuild database from cached data [skip ci]"
+          git push
