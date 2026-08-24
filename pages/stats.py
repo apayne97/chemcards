@@ -61,11 +61,15 @@ GROUPINGS = {
 
 stats = compute_stats()
 
-st.title("🧪 ChemCards")
-st.markdown(
-    "An interactive flashcard app for learning FDA-approved drugs and functional groups. "
-    "Use the sidebar to start a quiz."
-)
+col_logo, col_title = st.columns([1, 4])
+with col_logo:
+    st.image("assets/chemcards-logo.png", use_container_width=True)
+with col_title:
+    st.title("ChemCards")
+    st.markdown(
+        "An interactive flashcard app for learning FDA-approved drugs and functional groups. "
+        "Use the sidebar to start a quiz."
+    )
 
 st.divider()
 
