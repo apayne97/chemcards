@@ -10,6 +10,7 @@ class FunctionalGroup(BaseModel):
     name: str
     category: str = Field(None)
     smarts: str
+    display_smiles: str = Field(None)
 
     class Config:
         frozen = True

@@ -90,7 +90,7 @@ def build_filtered_db() -> MoleculeDB:
         # No class filter — include everything (or drop unclassified if unchecked)
         if include_none:
             return db
-        return MoleculeDB(molecules=[m for m in db.molecules if m.atc_classifications])
+        return db.subset([m for m in db.molecules if m.atc_classifications])
 
     selected_codes = {label_to_code[l] for l in selected_labels if l in label_to_code}
     mols = []
@@ -100,7 +100,7 @@ def build_filtered_db() -> MoleculeDB:
                 mols.append(m)
         elif include_none:
             mols.append(m)
-    return MoleculeDB(molecules=mols)
+    return db.subset(mols)
 
 
 def start_quiz(quiz_type: str):

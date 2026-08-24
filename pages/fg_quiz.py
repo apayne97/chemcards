@@ -5,7 +5,7 @@ from collections import Counter
 
 from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, FunctionalGroup
 from chemcards.flashcards.multiplechoice import MultipleChoice
-from utils import render_smarts
+from utils import render_fg
 
 CATEGORY_LABELS = {
     "amide_derivatives": "Amide derivatives",
@@ -181,7 +181,7 @@ def show_quiz():
     st.divider()
 
     if isinstance(q.display, FunctionalGroup):
-        img = render_smarts(q.display.smarts, size=300)
+        img = render_fg(q.display, size=300)
         if img:
             col_img, _ = st.columns([1, 2])
             with col_img:

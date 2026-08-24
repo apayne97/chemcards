@@ -12,7 +12,7 @@ import streamlit as st
 from rdkit import Chem
 
 from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, FunctionalGroup
-from utils import render_smarts
+from utils import render_fg
 
 MAX_GUESSES = 6
 P = "fgwordle_"
@@ -232,7 +232,7 @@ def show_game():
     st.caption(f"Guess {n_guesses}/{MAX_GUESSES} · Identify the functional group")
     st.divider()
 
-    img = render_smarts(target.smarts, size=300)
+    img = render_fg(target, size=300)
     col_img, col_game = st.columns([1, 1])
     with col_img:
         if img:

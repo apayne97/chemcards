@@ -1,8 +1,9 @@
 import yaml
 import streamlit as st
-from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS
+from rdkit.Chem import MolFromSmiles, MolFromSmarts
+from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, FunctionalGroup
 from chemcards.database.resources import DATABASE
-from utils import render_smarts
+from utils import render_fg
 
 CATEGORY_LABELS = {
     "amide_derivatives": "Amide derivatives",
@@ -20,6 +21,11 @@ CATEGORY_LABELS = {
 
 _yaml_order = yaml.safe_load((DATABASE / "functional_group_categories.yaml").read_text())
 CATEGORY_ORDER = [c.replace(" ", "_") for c in _yaml_order]
+
+
+def _atom_count(fg: FunctionalGroup) -> int:
+    mol = MolFromSmiles(fg.display_smiles) if fg.display_smiles else MolFromSmarts(fg.smarts)
+    return mol.GetNumHeavyAtoms() if mol else 0
 
 st.title("⚗️ Functional Group Glossary")
 
@@ -53,9 +59,9 @@ else:
         label = CATEGORY_LABELS.get(cat, cat.replace("_", " ").title())
         st.subheader(label)
         cols = st.columns(3)
-        for i, fg in enumerate(sorted(by_cat[cat], key=lambda x: x.name)):
+        for i, fg in enumerate(sorted(by_cat[cat], key=_atom_count)):
             with cols[i % 3]:
-                img = render_smarts(fg.smarts, size=200)
+                img = render_fg(fg, size=200)
                 if img:
                     st.image(img)
                 st.caption(f"**{fg.name}**")

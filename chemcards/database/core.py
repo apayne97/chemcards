@@ -26,16 +26,16 @@ class MoleculeDB(BaseModel):
     molecules: list[MoleculeEntry]
     last_updated: str | None = None
 
+    def subset(self, molecules: list["MoleculeEntry"]) -> "MoleculeDB":
+        return MoleculeDB.model_construct(molecules=molecules)
+
     def update(self, other: "MoleculeDB") -> "MoleculeDB":
         # Start with other (existing DB), then overwrite with self (new data).
         # self wins on conflicts so schema changes and fresh ChEMBL data always take effect.
         # Molecules only in other (e.g. manually added) are preserved.
         merged = {molecule.name: molecule for molecule in other.molecules}
         merged.update({molecule.name: molecule for molecule in self.molecules})
-        return MoleculeDB(
-            molecules=list(merged.values()),
-            last_updated=self.last_updated,
-        )
+        return MoleculeDB.model_construct(molecules=list(merged.values()), last_updated=self.last_updated)
 
     @classmethod
     def load(cls) -> "MoleculeDB":
