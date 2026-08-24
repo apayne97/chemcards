@@ -1,4 +1,3 @@
-import random
 import streamlit as st
 from collections import Counter
 
@@ -10,23 +9,6 @@ from chemcards.flashcards.multiplechoice import (
     MultipleChoice,
 )
 from utils import load_db, load_atc_lookup, render_smiles
-
-ATC_L1 = {
-    "A": "Alimentary tract & metabolism",
-    "B": "Blood & blood-forming organs",
-    "C": "Cardiovascular system",
-    "D": "Dermatologicals",
-    "G": "Genito-urinary system & sex hormones",
-    "H": "Systemic hormonal preparations",
-    "J": "Antiinfectives (systemic)",
-    "L": "Antineoplastic & immunomodulating",
-    "M": "Musculoskeletal system",
-    "N": "Nervous system",
-    "P": "Antiparasitic products",
-    "R": "Respiratory system",
-    "S": "Sensory organs",
-    "V": "Various",
-}
 
 QUIZ_TYPES = {
     "Molecule → Name": MultipleChoiceMoleculeToNameGenerator,
@@ -52,36 +34,64 @@ def init_state():
         "correct_last": None,
     }.items():
         st.session_state.setdefault(_k(key), val)
-    for code in ATC_L1:
-        st.session_state.setdefault(_k(f"atc_{code}"), True)
     st.session_state.setdefault(_k("atc_none"), True)
 
 
 @st.cache_data
-def compute_atc_counts() -> tuple[dict, int]:
+def compute_l3_data() -> tuple[list[str], dict[str, str], dict[str, int], int]:
+    """Returns (sorted_labels, label_to_code, label_to_count, no_atc_count).
+
+    Only includes L3 classes with >= 4 molecules so every selectable class
+    can form a valid quiz on its own.
+    """
+    atc_lookup = load_atc_lookup()
     db = load_db()
-    counts: Counter = Counter()
+
+    code_counts: Counter = Counter()
     no_atc = 0
     for m in db.molecules:
         if m.atc_classifications:
             seen: set = set()
             for code in m.atc_classifications:
-                if code and code[0] not in seen:
-                    counts[code[0]] += 1
-                    seen.add(code[0])
+                if len(code) >= 4:
+                    l3 = code[:4]
+                    if l3 not in seen:
+                        code_counts[l3] += 1
+                        seen.add(l3)
         else:
             no_atc += 1
-    return dict(counts), no_atc
+
+    label_to_code: dict[str, str] = {}
+    label_to_count: dict[str, int] = {}
+    for code, count in code_counts.items():
+        if count >= 4:
+            label = atc_lookup.get(code)
+            if label:
+                label_to_code[label] = code
+                label_to_count[label] = count
+
+    sorted_labels = sorted(label_to_count, key=lambda l: -label_to_count[l])
+    return sorted_labels, label_to_code, label_to_count, no_atc
 
 
 def build_filtered_db() -> MoleculeDB:
     db = load_db()
-    selected = {c for c in ATC_L1 if st.session_state.get(_k(f"atc_{c}"), True)}
-    include_none = st.session_state.get(_k("atc_none"), True)
+    _, label_to_code, _, _ = compute_l3_data()
+
+    selected_labels: list[str] = st.session_state.get(_k("l3_select"), [])
+    include_none: bool = st.session_state.get(_k("atc_none"), True)
+
+    if not selected_labels:
+        # No class filter — include everything (or drop unclassified if unchecked)
+        if include_none:
+            return db
+        return MoleculeDB(molecules=[m for m in db.molecules if m.atc_classifications])
+
+    selected_codes = {label_to_code[l] for l in selected_labels if l in label_to_code}
     mols = []
     for m in db.molecules:
         if m.atc_classifications:
-            if any(code[0] in selected for code in m.atc_classifications if code):
+            if any(len(c) >= 4 and c[:4] in selected_codes for c in m.atc_classifications if c):
                 mols.append(m)
         elif include_none:
             mols.append(m)
@@ -91,7 +101,7 @@ def build_filtered_db() -> MoleculeDB:
 def start_quiz(quiz_type: str):
     filtered = build_filtered_db()
     if len(filtered.molecules) < 4:
-        st.error("Need at least 4 molecules — select more drug classes.")
+        st.error("Not enough molecules in the current selection (need at least 4).")
         return
     gen = QUIZ_TYPES[quiz_type](molecule_db=filtered)
     st.session_state[_k("generator")] = gen
@@ -119,34 +129,28 @@ def reset_to_menu():
 # Sidebar
 # ---------------------------------------------------------------------------
 def show_sidebar():
-    atc_counts, no_atc_count = compute_atc_counts()
+    sorted_labels, _, label_to_count, no_atc = compute_l3_data()
     mode = st.session_state[_k("mode")]
 
     with st.sidebar:
-        st.markdown("### 🧬 Drug Class (ATC)")
-        c1, c2 = st.columns(2)
-        if c1.button("All", key=_k("btn_all"), use_container_width=True):
-            for code in ATC_L1:
-                st.session_state[_k(f"atc_{code}")] = True
-            st.session_state[_k("atc_none")] = True
-            st.rerun()
-        if c2.button("None", key=_k("btn_none"), use_container_width=True):
-            for code in ATC_L1:
-                st.session_state[_k(f"atc_{code}")] = False
-            st.session_state[_k("atc_none")] = False
-            st.rerun()
-
-        for code, label in ATC_L1.items():
-            count = atc_counts.get(code, 0)
-            st.checkbox(f"{label} ({count})", key=_k(f"atc_{code}"))
-        st.checkbox(f"Unclassified ({no_atc_count})", key=_k("atc_none"))
+        st.markdown("### 🧬 Pharmacological Class")
+        st.multiselect(
+            "Filter by class",
+            options=sorted_labels,
+            default=[],
+            key=_k("l3_select"),
+            format_func=lambda l: f"{l} ({label_to_count[l]})",
+            placeholder="All classes — type to search",
+            label_visibility="collapsed",
+        )
+        st.checkbox(f"Include unclassified ({no_atc:,})", key=_k("atc_none"))
 
         st.divider()
         quiz_type = st.radio("Quiz type", list(QUIZ_TYPES.keys()), key=_k("quiz_type_radio"))
         st.divider()
 
         pool_size = len(build_filtered_db().molecules)
-        st.caption(f"{pool_size:,} molecules selected")
+        st.caption(f"{pool_size:,} molecules in selection")
 
         if mode == "menu":
             st.button(
@@ -169,7 +173,8 @@ def show_menu():
     st.title("💊 Drugle")
     st.markdown(
         "Test your knowledge of FDA-approved drugs. "
-        "Use the sidebar to filter by drug class and choose a quiz type, then hit **Start Quiz**."
+        "Use the sidebar to filter by pharmacological class and choose a quiz type, "
+        "then hit **Start Quiz**."
     )
     st.divider()
     st.markdown("**Quiz types**")
@@ -189,8 +194,7 @@ def show_quiz():
 
     col_title, col_score, col_end = st.columns([4, 1, 1])
     with col_title:
-        quiz_type = st.session_state.get(_k("quiz_type_radio"), "Quiz")
-        st.subheader(quiz_type)
+        st.subheader(st.session_state.get(_k("quiz_type_radio"), "Quiz"))
     with col_score:
         st.metric("Score", f"{score}/{total}")
     with col_end:
@@ -260,10 +264,10 @@ def show_quiz():
                     for code in m.atc_classifications:
                         if len(code) >= 4:
                             label = atc_lookup.get(code[:4])
-                            if label:
+                            if label and label not in l3_labels:
                                 l3_labels.append(label)
                     if l3_labels:
-                        st.markdown(f"**Pharmacological class:** {', '.join(set(l3_labels))}")
+                        st.markdown(f"**Pharmacological class:** {', '.join(l3_labels)}")
                 st.markdown(f"**Mechanism:** {m.mechanism_of_action}")
                 if m.molecule_chembl_id != "unknown":
                     st.link_button(
