@@ -10,13 +10,14 @@ CATEGORY_LABELS = {
     "carbonyl_derivatives": "Carbonyl derivatives",
     "halogenated": "Halogenated",
     "hydrocarbon": "Hydrocarbon",
-    "multiple_heteroatom_heteroaromatic": "Multi-heteroatom aromatics",
+    "multiple_heteroatom_acyclic": "Multi-heteroatom acyclic",
+    "multiple_heteroatom_heterocycles": "Multi-heteroatom heterocycles",
     "nitrogen_functionalities": "Nitrogen functionalities",
-    "nitrogen_heteroaromatic": "Nitrogen heteroaromatics",
+    "nitrogen_heterocycles": "Nitrogen heterocycles",
     "oxygen_functionalities": "Oxygen functionalities",
-    "oxygen_heteroaromatic": "Oxygen heteroaromatics",
+    "oxygen_heterocycles": "Oxygen heterocycles",
     "sulfur_functionalities": "Sulfur functionalities",
-    "sulfur_heteroaromatic": "Sulfur heteroaromatics",
+    "sulfur_heterocycles": "Sulfur heterocycles",
 }
 
 _yaml_order = yaml.safe_load((DATABASE / "functional_group_categories.yaml").read_text())
