@@ -177,11 +177,11 @@ def show_sidebar():
 # Main area: menu
 # ---------------------------------------------------------------------------
 def show_menu():
-    st.title("💊 Drugle")
+    st.title("💊 Drug Quiz")
     st.markdown(
         "Test your knowledge of FDA-approved drugs. "
-        "Use the sidebar to filter by pharmacological class and choose a quiz type, "
-        "then hit **Start Quiz**."
+        "Filter by pharmacological class in the sidebar, pick a quiz type, "
+        "and hit **Start Quiz**."
     )
     st.divider()
     st.markdown("**Quiz types**")

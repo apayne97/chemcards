@@ -148,7 +148,7 @@ def show_sidebar():
 # Main area: menu
 # ---------------------------------------------------------------------------
 def show_menu():
-    st.title("⚗️ MedChemble")
+    st.title("⚗️ FG Quiz")
     st.markdown(
         "Test your knowledge of medicinal chemistry functional groups. "
         "Use the sidebar to filter by category, then hit **Start Quiz**."
