@@ -2,7 +2,7 @@ import streamlit as st
 from pathlib import Path
 from PIL import Image
 
-_icon_path = Path("assets/icon.png")
+_icon_path = Path("assets/chemcards-logo.png")
 _icon = Image.open(_icon_path) if _icon_path.exists() else "🧪"
 
 st.set_page_config(page_title="ChemCards", page_icon=_icon, layout="centered")

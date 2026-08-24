@@ -18,7 +18,7 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
 ]
-dependencies = ["rdkit", "pydantic", "chembl_webresource_client", "tqdm", "click", "pyyaml", "pillow"]
+dependencies = ["rdkit", "pydantic", "chembl_webresource_client", "tqdm", "click", "pyyaml", "pillow", "plotly"]
 
 [project.urls]
 "Homepage" = "https://github.com/apayne97"
