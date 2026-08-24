@@ -1,3 +1,4 @@
+import difflib
 import random
 import streamlit as st
 from collections import Counter
@@ -25,6 +26,10 @@ P = "medchemble_"
 
 def _k(key):
     return P + key
+
+
+def _norm(s: str) -> str:
+    return "".join(s.lower().split()).replace("-", "").replace(",", "")
 
 
 def _all_categories() -> list[str]:
@@ -120,6 +125,7 @@ def show_sidebar():
             label = CATEGORY_LABELS.get(cat, cat.replace("_", " ").title())
             st.checkbox(f"{label} ({counts[cat]})", key=_k(f"cat_{cat}"))
 
+        st.radio("Answer mode", ["Multiple choice", "Type answer"], key=_k("answer_mode"))
         st.divider()
 
         pool_size = len(build_filtered_fgs())
@@ -183,26 +189,56 @@ def show_quiz():
                 st.image(img)
 
     st.subheader(q.question)
-    radio_key = _k(f"radio_{total}")
-    radio_val = st.radio("Your answer:", q.choices, index=None, key=radio_key, disabled=answered)
-    selected_idx = q.choices.index(radio_val) if radio_val else None
+
+    answer_mode = st.session_state.get(_k("answer_mode"), "Multiple choice")
+    text_mode = answer_mode == "Type answer"
+    correct_name = q.choices[q.answer_index]
+
+    if text_mode:
+        with st.form(key=_k(f"text_form_{total}"), clear_on_submit=False):
+            guess = st.text_input("Type the functional group name:", disabled=answered)
+            submitted = st.form_submit_button("Check", type="primary",
+                                              use_container_width=True, disabled=answered)
+        if submitted and guess.strip() and not answered:
+            ratio = difflib.SequenceMatcher(None, _norm(guess), _norm(correct_name)).ratio()
+            if _norm(guess) == _norm(correct_name):
+                st.session_state[_k("answered")] = True
+                st.session_state[_k("total")] += 1
+                st.session_state[_k("correct_last")] = True
+                st.session_state[_k("score")] += 1
+                st.rerun()
+            elif ratio > 0.8:
+                st.warning("So close — check your spelling and try again.")
+            else:
+                st.error("Not quite. Try again or reveal the answer.")
+    else:
+        radio_key = _k(f"radio_{total}")
+        radio_val = st.radio("Your answer:", q.choices, index=None, key=radio_key, disabled=answered)
+        selected_idx = q.choices.index(radio_val) if radio_val else None
 
     st.divider()
 
     if not answered:
-        if st.button("Check Answer", disabled=(radio_val is None), type="primary"):
-            st.session_state[_k("answered")] = True
-            st.session_state[_k("total")] += 1
-            correct = selected_idx == q.answer_index
-            st.session_state[_k("correct_last")] = correct
-            if correct:
-                st.session_state[_k("score")] += 1
-            st.rerun()
+        if text_mode:
+            if st.button("Reveal answer / I don't know", use_container_width=True):
+                st.session_state[_k("answered")] = True
+                st.session_state[_k("total")] += 1
+                st.session_state[_k("correct_last")] = False
+                st.rerun()
+        else:
+            if st.button("Check Answer", disabled=(radio_val is None), type="primary"):
+                st.session_state[_k("answered")] = True
+                st.session_state[_k("total")] += 1
+                correct = selected_idx == q.answer_index
+                st.session_state[_k("correct_last")] = correct
+                if correct:
+                    st.session_state[_k("score")] += 1
+                st.rerun()
     else:
         if st.session_state[_k("correct_last")]:
             st.success("Correct!")
         else:
-            st.error(f"The answer was: **{q.choices[q.answer_index]}**")
+            st.error(f"The answer was: **{correct_name}**")
 
         if isinstance(q.display, FunctionalGroup):
             with st.expander("Functional group details"):

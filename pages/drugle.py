@@ -1,3 +1,4 @@
+import difflib
 import streamlit as st
 from collections import Counter
 
@@ -21,6 +22,10 @@ P = "drugle_"
 
 def _k(key):
     return P + key
+
+
+def _norm(s: str) -> str:
+    return "".join(s.lower().split()).replace("-", "").replace(",", "")
 
 
 def init_state():
@@ -147,6 +152,8 @@ def show_sidebar():
 
         st.divider()
         quiz_type = st.radio("Quiz type", list(QUIZ_TYPES.keys()), key=_k("quiz_type_radio"))
+        if quiz_type == "Molecule → Name":
+            st.radio("Answer mode", ["Multiple choice", "Type answer"], key=_k("answer_mode"))
         st.divider()
 
         pool_size = len(build_filtered_db().molecules)
@@ -228,32 +235,63 @@ def show_quiz():
                 with col_img:
                     st.image(img)
         st.subheader(q.question)
-        radio_val = st.radio("Your answer:", q.choices, index=None, key=radio_key, disabled=answered)
-        selected_idx = q.choices.index(radio_val) if radio_val else None
+
+        quiz_type = st.session_state.get(_k("quiz_type_radio"), "")
+        answer_mode = st.session_state.get(_k("answer_mode"), "Multiple choice")
+        text_mode = quiz_type == "Molecule → Name" and answer_mode == "Type answer"
+
+        if text_mode:
+            correct_name = q.choices[q.answer_index]
+            with st.form(key=_k(f"text_form_{total}"), clear_on_submit=False):
+                guess = st.text_input("Type the drug name:", disabled=answered)
+                submitted = st.form_submit_button("Check", type="primary",
+                                                  use_container_width=True, disabled=answered)
+            if submitted and guess.strip() and not answered:
+                ratio = difflib.SequenceMatcher(None, _norm(guess), _norm(correct_name)).ratio()
+                if _norm(guess) == _norm(correct_name):
+                    st.session_state[_k("answered")] = True
+                    st.session_state[_k("total")] += 1
+                    st.session_state[_k("correct_last")] = True
+                    st.session_state[_k("score")] += 1
+                    st.rerun()
+                elif ratio > 0.8:
+                    st.warning("So close — check your spelling and try again.")
+                else:
+                    st.error("Not quite. Try again or reveal the answer.")
+            selected_idx = None  # not used in text mode
+            radio_val = None
+        else:
+            radio_val = st.radio("Your answer:", q.choices, index=None, key=radio_key, disabled=answered)
+            selected_idx = q.choices.index(radio_val) if radio_val else None
 
     st.divider()
 
     if not answered:
-        if st.button("Check Answer", disabled=(radio_val is None), type="primary"):
-            st.session_state[_k("answered")] = True
-            st.session_state[_k("total")] += 1
-            # For target questions, any known target of the molecule is correct.
-            selected_choice = q.choices[selected_idx] if selected_idx is not None else None
-            all_targets = getattr(q.answer_molecule, "all_targets", []) if q.answer_molecule else []
-            correct = (selected_idx == q.answer_index) or (
-                bool(all_targets)
-                and not choices_are_molecules
-                and selected_choice in all_targets
-            )
-            st.session_state[_k("correct_last")] = correct
-            if correct:
-                st.session_state[_k("score")] += 1
-            st.rerun()
+        if text_mode:
+            if st.button("Reveal answer / I don't know", use_container_width=True):
+                st.session_state[_k("answered")] = True
+                st.session_state[_k("total")] += 1
+                st.session_state[_k("correct_last")] = False
+                st.rerun()
+        else:
+            if st.button("Check Answer", disabled=(radio_val is None), type="primary"):
+                st.session_state[_k("answered")] = True
+                st.session_state[_k("total")] += 1
+                selected_choice = q.choices[selected_idx] if selected_idx is not None else None
+                all_targets = getattr(q.answer_molecule, "all_targets", []) if q.answer_molecule else []
+                correct = (selected_idx == q.answer_index) or (
+                    bool(all_targets)
+                    and not choices_are_molecules
+                    and selected_choice in all_targets
+                )
+                st.session_state[_k("correct_last")] = correct
+                if correct:
+                    st.session_state[_k("score")] += 1
+                st.rerun()
     else:
         if st.session_state[_k("correct_last")]:
-            # Show a note if the user picked a secondary target
             selected_choice = q.choices[selected_idx] if selected_idx is not None else None
-            if selected_idx != q.answer_index and selected_choice:
+            if not text_mode and selected_idx != q.answer_index and selected_choice:
                 st.success(f"Also correct! **{selected_choice}** is another known target of this drug.")
             else:
                 st.success("Correct!")
@@ -262,7 +300,7 @@ def show_quiz():
             if isinstance(ans, MoleculeEntry):
                 ans = ans.name
             all_targets = getattr(q.answer_molecule, "all_targets", []) if q.answer_molecule else []
-            if len(all_targets) > 1:
+            if not text_mode and len(all_targets) > 1:
                 st.error(f"Incorrect. Known targets: **{', '.join(all_targets)}**")
             else:
                 st.error(f"The answer was: **{ans}**")
