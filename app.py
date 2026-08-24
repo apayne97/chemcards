@@ -9,6 +9,7 @@ st.set_page_config(page_title="ChemCards", page_icon=_icon, layout="centered")
 
 pg = st.navigation([
     st.Page("pages/stats.py", title="Home", default=True),
-    st.Page("pages/quiz.py", title="Quiz", icon="🧪"),
+    st.Page("pages/drugle.py", title="Drugle", icon="💊"),
+    st.Page("pages/medchemble.py", title="MedChemble", icon="⚗️"),
 ])
 pg.run()

@@ -6,6 +6,7 @@ if not DATABASE.exists():
 CHEMBL_DOWNLOAD = DATABASE / "chembl_approved_drugs.json"
 CHEMBL_MECHANISM_DOWNLOAD = DATABASE / "chembl_mechanism_approved_drugs.json"
 CHEMBL_TARGET_DOWNLOAD = DATABASE / "chembl_target_approved_drugs.json"
+CHEMBL_ATC_DOWNLOAD = DATABASE / "chembl_atc_classes.json"
 MOLECULE_DATABASE = DATABASE / "molecule_database.json"
 TEMP_DIR = DATABASE / "temp"
 FUNCTIONAL_GROUPS_DATABASE = DATABASE / "functional_groups.yaml"

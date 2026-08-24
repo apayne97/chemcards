@@ -4,6 +4,7 @@ from chemcards.database.resources import (
     CHEMBL_DOWNLOAD,
     CHEMBL_MECHANISM_DOWNLOAD,
     CHEMBL_TARGET_DOWNLOAD,
+    CHEMBL_ATC_DOWNLOAD,
 )
 from chemcards.database.core import MoleculeEntry, MoleculeDB
 from pydantic import BaseModel
@@ -44,19 +45,57 @@ def download_drug_mechanisms():
 
 
 def download_drug_targets():
+    """Fetch pref_name for every target referenced in the mechanism download.
+
+    Saves a dict {target_chembl_id: pref_name} rather than raw records.
+    Requires CHEMBL_MECHANISM_DOWNLOAD to already exist.
+    """
+    from chembl_webresource_client.new_client import new_client
+
+    with open(CHEMBL_MECHANISM_DOWNLOAD) as f:
+        mechanisms = json.load(f)
+
+    unique_ids = list({m["target_chembl_id"] for m in mechanisms if m.get("target_chembl_id")})
+
+    # Chunk to avoid hitting URL length limits on the ChEMBL REST API
+    chunk_size = 100
+    target_dict: dict = {}
+    for i in range(0, len(unique_ids), chunk_size):
+        chunk = unique_ids[i : i + chunk_size]
+        records = new_client.target.filter(target_chembl_id__in=chunk).only(
+            ["target_chembl_id", "pref_name"]
+        )
+        for record in records:
+            target_dict[record["target_chembl_id"]] = record["pref_name"]
+
+    logger.info("Fetched names for %d/%d targets.", len(target_dict), len(unique_ids))
+    with open(CHEMBL_TARGET_DOWNLOAD, "w") as f:
+        json.dump(target_dict, f)
+
+
+def download_atc_classes() -> None:
+    """Download ATC hierarchy from ChEMBL and save a {code: description} lookup.
+
+    Covers all four levels so stats can group at any granularity.
+    Saves e.g. {"L": "Antineoplastic...", "L01": "Antineoplastic agents",
+                 "L01E": "Protein kinase inhibitors", "L01ED": "BCR-ABL..."}.
+    """
     from chembl_webresource_client.new_client import new_client
     from tqdm import tqdm
 
-    # Get all approved drugs
-    approved_drugs = new_client.target.filter(
-        max_phase=4,
-        molecule_type="Small molecule",
-    )
-    approved_drugs = [drug for drug in tqdm(approved_drugs)]
+    records = [r for r in tqdm(new_client.atc_class.all())]
 
-    # Save Locally
-    with open(CHEMBL_TARGET_DOWNLOAD, "w") as f:
-        json.dump(approved_drugs, f)
+    atc_lookup: dict[str, str] = {}
+    for r in records:
+        for level in range(1, 5):
+            code = r.get(f"level{level}")
+            desc = r.get(f"level{level}_description")
+            if code and desc:
+                atc_lookup[code] = desc.title()
+
+    logger.info("ATC lookup: %d entries across 4 levels.", len(atc_lookup))
+    with open(CHEMBL_ATC_DOWNLOAD, "w") as f:
+        json.dump(atc_lookup, f)
 
 
 class ChemblMoleculeEntry(MoleculeEntry):
@@ -182,64 +221,68 @@ class ChemblDB(MoleculeDB):
 
     @classmethod
     def from_mechanism(cls) -> "ChemblDB":
-        from tqdm import tqdm
+        """Build a ChemblDB by joining local mechanism, molecule, and target files.
 
-        with open(CHEMBL_MECHANISM_DOWNLOAD, "r") as f:
+        No API calls — pure local JSON lookups.
+        """
+        with open(CHEMBL_DOWNLOAD) as f:
+            mol_lookup: dict = {
+                m["molecule_chembl_id"]: m
+                for m in json.load(f)
+                if m.get("molecule_chembl_id")
+            }
+
+        with open(CHEMBL_TARGET_DOWNLOAD) as f:
+            target_lookup: dict = json.load(f)  # {target_chembl_id: pref_name}
+
+        with open(CHEMBL_MECHANISM_DOWNLOAD) as f:
             mechanism_list = json.load(f)
-        raw_mechanisms = [ChemblMechanismEntry.from_download(entry) for entry in mechanism_list]
-        skipped_mechanisms = sum(1 for x in raw_mechanisms if x is None)
-        filtered_mechanism_list = [m for m in raw_mechanisms if m is not None]
 
-        logger.info("ChemBL mechanisms: loaded=%d skipped=%d", len(filtered_mechanism_list), skipped_mechanisms)
+        raw_mechanisms = [ChemblMechanismEntry.from_download(entry) for entry in mechanism_list]
+        filtered_mechanisms = [m for m in raw_mechanisms if m is not None]
+        logger.info("ChemBL mechanisms: parsed=%d skipped=%d",
+                    len(filtered_mechanisms), len(raw_mechanisms) - len(filtered_mechanisms))
 
         converted_molecules = []
-        skipped_molecule_lookups = 0
-        skipped_build_failures = 0
-        for loaded_mechanism in tqdm(filtered_mechanism_list):
-            try:
-                mol_dict = loaded_mechanism.query_chembl_for_molecule()
-            except Exception as e:
-                logger.debug("Failed to query ChemBL for molecule %s: %s", loaded_mechanism.molecule_chembl_id, e)
-                skipped_molecule_lookups += 1
+        skipped = 0
+        for mech in filtered_mechanisms:
+            mol_dict = mol_lookup.get(mech.molecule_chembl_id)
+            if mol_dict is None:
+                skipped += 1
                 continue
 
             molecule = ChemblMoleculeEntry.from_download(mol_dict)
             if molecule is None:
-                # Could not construct a molecule from the queried data
-                skipped_molecule_lookups += 1
-                continue
-            try:
-                converted_molecules.append(
-                    ChemblMoleculeEntry(
-                        name=molecule.name,
-                        smiles=molecule.smiles,
-                        target=loaded_mechanism.query_chembl_for_target(),
-                        indication=molecule.indication,
-                        molecule_chembl_id=loaded_mechanism.molecule_chembl_id,
-                        target_chembl_id=loaded_mechanism.target_chembl_id,
-                        mechanism_of_action=loaded_mechanism.mechanism_of_action,
-                        action_type=loaded_mechanism.action_type,
-                        atc_classifications=molecule.atc_classifications,
-                    )
-                )
-            except Exception as e:
-                logger.debug("Failed to build converted molecule from mechanism entry: %s", e)
-                skipped_build_failures += 1
+                skipped += 1
                 continue
 
-        logger.info(
-            "ChemBL mechanism conversion: converted=%d skipped_lookup=%d skipped_build=%d",
-            len(converted_molecules),
-            skipped_molecule_lookups,
-            skipped_build_failures,
-        )
+            target_name = target_lookup.get(mech.target_chembl_id, "unknown")
+            usan_stem = mol_dict.get("usan_stem_definition") or "unknown"
+            converted_molecules.append(
+                ChemblMoleculeEntry(
+                    name=molecule.name,
+                    smiles=molecule.smiles,
+                    target=target_name,
+                    usan_stem_definition=usan_stem,
+                    indication=molecule.indication,
+                    molecule_chembl_id=mech.molecule_chembl_id,
+                    target_chembl_id=mech.target_chembl_id,
+                    mechanism_of_action=mech.mechanism_of_action,
+                    action_type=mech.action_type,
+                    atc_classifications=molecule.atc_classifications,
+                )
+            )
+
+        logger.info("ChemBL mechanism conversion: converted=%d skipped=%d",
+                    len(converted_molecules), skipped)
         return cls(molecules=converted_molecules)
 
 
 def download_raw_data(force: bool = False) -> None:
-    """Download raw ChEMBL molecule and mechanism data to local JSON files.
+    """Download raw ChEMBL molecule, mechanism, and target data to local JSON files.
 
     Skips files that already exist unless force=True.
+    Target download requires mechanism data to be present first.
     """
     if force or not CHEMBL_DOWNLOAD.exists():
         logger.info("Downloading ChEMBL molecule data...")
@@ -253,13 +296,24 @@ def download_raw_data(force: bool = False) -> None:
     else:
         logger.info("ChEMBL mechanism data already cached, skipping download.")
 
+    if force or not CHEMBL_TARGET_DOWNLOAD.exists():
+        logger.info("Fetching ChEMBL target names...")
+        download_drug_targets()
+    else:
+        logger.info("ChEMBL target data already cached, skipping download.")
+
+    if force or not CHEMBL_ATC_DOWNLOAD.exists():
+        logger.info("Fetching ChEMBL ATC class hierarchy...")
+        download_atc_classes()
+    else:
+        logger.info("ChEMBL ATC data already cached, skipping download.")
+
 
 def build_molecule_database() -> None:
-    """Build molecule_database.json from cached raw ChEMBL files."""
+    """Build molecule_database.json by joining cached raw ChEMBL files. No API calls."""
     from datetime import datetime, timezone
 
     logger.info("Building molecule database...")
-    mydb = ChemblDB.from_download()
     mydb = ChemblDB.from_mechanism()
     mydb.remove_duplicates()
     mydb.last_updated = datetime.now(timezone.utc).strftime("%Y-%m-%d")

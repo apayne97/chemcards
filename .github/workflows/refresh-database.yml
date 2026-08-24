@@ -9,10 +9,14 @@ jobs:
   refresh-database:
     runs-on: ubuntu-latest
     permissions:
-      contents: write      # Needed to push updated molecule_database.json
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Get month for cache key
+        id: date
+        run: echo "month=$(date +'%Y-%m')" >> $GITHUB_OUTPUT
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -22,6 +26,17 @@ jobs:
       - name: Install dependencies
         run: pip install -e .
 
+      # Save raw ChEMBL downloads to cache keyed by month.
+      # The cache is written at job end if the key is new (i.e. first run this month).
+      - name: Cache ChEMBL raw data
+        uses: actions/cache@v4
+        with:
+          path: |
+            chemcards/database/data/chembl_approved_drugs.json
+            chemcards/database/data/chembl_mechanism_approved_drugs.json
+            chemcards/database/data/chembl_target_approved_drugs.json
+          key: chembl-${{ steps.date.outputs.month }}
+
       - name: Download and regenerate database
         run: chemcards update-database --force
 
@@ -29,6 +44,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add chemcards/database/data/molecule_database.json
+          git add chemcards/database/data/molecule_database.json chemcards/database/data/chembl_atc_classes.json
           git diff --cached --quiet || git commit -m "chore: refresh ChEMBL database [skip ci]"
           git push

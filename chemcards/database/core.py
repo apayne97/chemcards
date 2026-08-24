@@ -9,6 +9,7 @@ class MoleculeEntry(BaseModel):
     name: str
     smiles: str
     target: str = Field("unknown")
+    usan_stem_definition: str = Field("unknown")
     indication: str = Field("unknown")
     mechanism_of_action: str = Field("unknown")
     action_type: str = Field("unknown")
@@ -25,11 +26,13 @@ class MoleculeDB(BaseModel):
     last_updated: str | None = None
 
     def update(self, other: "MoleculeDB") -> "MoleculeDB":
-        self_molecules = {molecule.name: molecule for molecule in self.molecules}
-        other_molecules = {molecule.name: molecule for molecule in other.molecules}
-        self_molecules.update(other_molecules)
+        # Start with other (existing DB), then overwrite with self (new data).
+        # self wins on conflicts so schema changes and fresh ChEMBL data always take effect.
+        # Molecules only in other (e.g. manually added) are preserved.
+        merged = {molecule.name: molecule for molecule in other.molecules}
+        merged.update({molecule.name: molecule for molecule in self.molecules})
         return MoleculeDB(
-            molecules=list(self_molecules.values()),
+            molecules=list(merged.values()),
             last_updated=self.last_updated,
         )
 

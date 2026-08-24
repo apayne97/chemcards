@@ -3,7 +3,7 @@ import plotly.express as px
 import pandas as pd
 from collections import Counter
 
-from utils import load_db
+from utils import load_db, load_atc_lookup
 
 ATC_L1 = {
     "A": "Alimentary tract & metabolism",
@@ -26,36 +26,49 @@ ATC_L1 = {
 @st.cache_data
 def compute_stats() -> dict:
     db = load_db()
+    atc_lookup = load_atc_lookup()
     mols = db.molecules
     targets = Counter(m.target for m in mols if m.target != "unknown")
-    mechanisms = Counter(m.mechanism_of_action for m in mols if m.mechanism_of_action != "unknown")
+    usan_stems = Counter(m.usan_stem_definition for m in mols if m.usan_stem_definition != "unknown")
     action_types = Counter(m.action_type for m in mols if m.action_type != "unknown")
 
     drug_classes: Counter = Counter()
+    pharm_classes: Counter = Counter()
     for m in mols:
-        seen: set = set()
+        seen_l1: set = set()
+        seen_l3: set = set()
         for code in m.atc_classifications:
-            label = ATC_L1.get(code[0]) if code else None
-            if label and label not in seen:
-                drug_classes[label] += 1
-                seen.add(label)
+            if not code:
+                continue
+            # Level 1 (1 char): organ system
+            l1 = ATC_L1.get(code[0])
+            if l1 and l1 not in seen_l1:
+                drug_classes[l1] += 1
+                seen_l1.add(l1)
+            # Level 3 (4 chars): pharmacological class
+            if len(code) >= 4:
+                l3_label = atc_lookup.get(code[:4])
+                if l3_label and l3_label not in seen_l3:
+                    pharm_classes[l3_label] += 1
+                    seen_l3.add(l3_label)
 
     return {
         "total": len(mols),
         "n_targets": len(targets),
         "n_action_types": len(action_types),
-        "n_mechanisms": len(mechanisms),
         "targets": targets,
-        "mechanisms": mechanisms,
+        "usan_stems": usan_stems,
         "action_types": action_types,
         "drug_classes": drug_classes,
+        "pharm_classes": pharm_classes,
     }
 
 
 GROUPINGS = {
-    "Drug Class (ATC)": ("drug_classes", None),
-    "Target (USAN)": ("targets", 20),
-    "Mechanism of Action": ("mechanisms", 20),
+    "Pharmacological Class (ATC)": ("pharm_classes", 25),
+    "Organ System (ATC)": ("drug_classes", None),
+    "Drug Family (USAN stem)": ("usan_stems", 20),
+    "Biological Target": ("targets", 20),
     "Action Type": ("action_types", None),
 }
 
