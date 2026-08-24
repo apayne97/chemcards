@@ -9,6 +9,7 @@ class MoleculeEntry(BaseModel):
     name: str
     smiles: str
     target: str = Field("unknown")
+    all_targets: list[str] = Field(default_factory=list)
     usan_stem_definition: str = Field("unknown")
     indication: str = Field("unknown")
     mechanism_of_action: str = Field("unknown")

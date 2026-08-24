@@ -1,5 +1,6 @@
 import json
 import logging
+from collections import defaultdict
 from chemcards.database.resources import (
     CHEMBL_DOWNLOAD,
     CHEMBL_MECHANISM_DOWNLOAD,
@@ -243,8 +244,12 @@ class ChemblDB(MoleculeDB):
         logger.info("ChemBL mechanisms: parsed=%d skipped=%d",
                     len(filtered_mechanisms), len(raw_mechanisms) - len(filtered_mechanisms))
 
-        converted_molecules = []
+        # Group by molecule name: store base data once, accumulate all unique targets.
+        mol_base: dict[str, tuple] = {}        # name → (ChemblMoleculeEntry, raw mol_dict)
+        mol_primary_mech: dict[str, "ChemblMechanismEntry"] = {}  # name → first mechanism
+        mol_targets: dict[str, list[str]] = defaultdict(list)
         skipped = 0
+
         for mech in filtered_mechanisms:
             mol_dict = mol_lookup.get(mech.molecule_chembl_id)
             if mol_dict is None:
@@ -256,19 +261,33 @@ class ChemblDB(MoleculeDB):
                 skipped += 1
                 continue
 
+            name = molecule.name
             target_name = target_lookup.get(mech.target_chembl_id, "unknown")
+
+            if name not in mol_base:
+                mol_base[name] = (molecule, mol_dict)
+                mol_primary_mech[name] = mech
+
+            if target_name != "unknown" and target_name not in mol_targets[name]:
+                mol_targets[name].append(target_name)
+
+        converted_molecules = []
+        for name, (molecule, mol_dict) in mol_base.items():
+            targets = mol_targets[name]
+            primary_mech = mol_primary_mech[name]
             usan_stem = mol_dict.get("usan_stem_definition") or "unknown"
             converted_molecules.append(
                 ChemblMoleculeEntry(
                     name=molecule.name,
                     smiles=molecule.smiles,
-                    target=target_name,
+                    target=targets[0] if targets else "unknown",
+                    all_targets=targets,
                     usan_stem_definition=usan_stem,
                     indication=molecule.indication,
-                    molecule_chembl_id=mech.molecule_chembl_id,
-                    target_chembl_id=mech.target_chembl_id,
-                    mechanism_of_action=mech.mechanism_of_action,
-                    action_type=mech.action_type,
+                    molecule_chembl_id=primary_mech.molecule_chembl_id,
+                    target_chembl_id=primary_mech.target_chembl_id,
+                    mechanism_of_action=primary_mech.mechanism_of_action,
+                    action_type=primary_mech.action_type,
                     atc_classifications=molecule.atc_classifications,
                 )
             )
@@ -315,7 +334,6 @@ def build_molecule_database() -> None:
 
     logger.info("Building molecule database...")
     mydb = ChemblDB.from_mechanism()
-    mydb.remove_duplicates()
     mydb.last_updated = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     mydb.save()
     logger.info("Done. %d molecules written to database.", len(mydb.molecules))

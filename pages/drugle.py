@@ -237,19 +237,35 @@ def show_quiz():
         if st.button("Check Answer", disabled=(radio_val is None), type="primary"):
             st.session_state[_k("answered")] = True
             st.session_state[_k("total")] += 1
-            correct = selected_idx == q.answer_index
+            # For target questions, any known target of the molecule is correct.
+            selected_choice = q.choices[selected_idx] if selected_idx is not None else None
+            all_targets = getattr(q.answer_molecule, "all_targets", []) if q.answer_molecule else []
+            correct = (selected_idx == q.answer_index) or (
+                bool(all_targets)
+                and not choices_are_molecules
+                and selected_choice in all_targets
+            )
             st.session_state[_k("correct_last")] = correct
             if correct:
                 st.session_state[_k("score")] += 1
             st.rerun()
     else:
         if st.session_state[_k("correct_last")]:
-            st.success("Correct!")
+            # Show a note if the user picked a secondary target
+            selected_choice = q.choices[selected_idx] if selected_idx is not None else None
+            if selected_idx != q.answer_index and selected_choice:
+                st.success(f"Also correct! **{selected_choice}** is another known target of this drug.")
+            else:
+                st.success("Correct!")
         else:
             ans = q.choices[q.answer_index]
             if isinstance(ans, MoleculeEntry):
                 ans = ans.name
-            st.error(f"The answer was: **{ans}**")
+            all_targets = getattr(q.answer_molecule, "all_targets", []) if q.answer_molecule else []
+            if len(all_targets) > 1:
+                st.error(f"Incorrect. Known targets: **{', '.join(all_targets)}**")
+            else:
+                st.error(f"The answer was: **{ans}**")
 
         if q.answer_molecule:
             atc_lookup = load_atc_lookup()

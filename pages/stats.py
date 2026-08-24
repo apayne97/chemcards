@@ -125,3 +125,12 @@ fig.update_layout(
     height=max(300, len(df) * 22),
 )
 st.plotly_chart(fig, use_container_width=True)
+
+st.divider()
+
+# --- Meet the author ---
+st.markdown("#### Meet the author")
+st.markdown(
+    "ChemCards was built by **Alex Payne**, a computational chemist at the Chodera Lab. "
+    "Learn more at [apayne.org](https://apayne.org/)."
+)
