@@ -3,22 +3,7 @@ import streamlit as st
 from rdkit.Chem import MolFromSmiles, MolFromSmarts
 from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, FunctionalGroup
 from chemcards.database.resources import DATABASE
-from utils import render_fg
-
-CATEGORY_LABELS = {
-    "amide_derivatives": "Amide derivatives",
-    "carbonyl_derivatives": "Carbonyl derivatives",
-    "halogenated": "Halogenated",
-    "hydrocarbon": "Hydrocarbon",
-    "multiple_heteroatom_acyclic": "Multi-heteroatom acyclic",
-    "multiple_heteroatom_heterocycles": "Multi-heteroatom heterocycles",
-    "nitrogen_functionalities": "Nitrogen functionalities",
-    "nitrogen_heterocycles": "Nitrogen heterocycles",
-    "oxygen_functionalities": "Oxygen functionalities",
-    "oxygen_heterocycles": "Oxygen heterocycles",
-    "sulfur_functionalities": "Sulfur functionalities",
-    "sulfur_heterocycles": "Sulfur heterocycles",
-}
+from utils import render_fg, FG_CATEGORY_LABELS
 
 _yaml_order = yaml.safe_load((DATABASE / "functional_group_categories.yaml").read_text())
 CATEGORY_ORDER = [c.replace(" ", "_") for c in _yaml_order]
@@ -38,7 +23,7 @@ with st.sidebar:
     selected_cats = st.multiselect(
         "Category",
         options=all_cats,
-        format_func=lambda c: CATEGORY_LABELS.get(c, c.replace("_", " ").title()),
+        format_func=lambda c: FG_CATEGORY_LABELS.get(c, c.replace("_", " ").title()),
         default=[],
         placeholder="All categories",
     )
@@ -57,7 +42,7 @@ if not by_cat:
     st.info("No functional groups match your search.")
 else:
     for cat in [c for c in CATEGORY_ORDER if c in by_cat]:
-        label = CATEGORY_LABELS.get(cat, cat.replace("_", " ").title())
+        label = FG_CATEGORY_LABELS.get(cat, cat.replace("_", " ").title())
         st.subheader(label)
         cols = st.columns(3)
         for i, fg in enumerate(sorted(by_cat[cat], key=_atom_count)):

@@ -1,6 +1,5 @@
 import difflib
 import streamlit as st
-from collections import Counter
 
 from chemcards.database.core import MoleculeDB, MoleculeEntry
 from chemcards.flashcards.multiplechoice import (
@@ -9,7 +8,10 @@ from chemcards.flashcards.multiplechoice import (
     MultipleChoiceNameToMoleculeGenerator,
     MultipleChoice,
 )
-from utils import load_db, load_atc_lookup, render_smiles
+from utils import (
+    load_db, load_atc_lookup, render_smiles,
+    norm_name, compute_l3_data, build_filtered_drug_db, show_quiz_result,
+)
 
 QUIZ_TYPES = {
     "Molecule → Name": MultipleChoiceMoleculeToNameGenerator,
@@ -17,15 +19,11 @@ QUIZ_TYPES = {
     "Molecule → Target": MultipleChoiceMoleculeToTargetGenerator,
 }
 
-P = "drugle_"
+P = "drug_quiz_"
 
 
 def _k(key):
     return P + key
-
-
-def _norm(s: str) -> str:
-    return "".join(s.lower().split()).replace("-", "").replace(",", "")
 
 
 def init_state():
@@ -42,65 +40,8 @@ def init_state():
     st.session_state.setdefault(_k("atc_none"), True)
 
 
-@st.cache_data
-def compute_l3_data() -> tuple[list[str], dict[str, str], dict[str, int], int]:
-    """Returns (sorted_labels, label_to_code, label_to_count, no_atc_count).
-
-    Only includes L3 classes with >= 4 molecules so every selectable class
-    can form a valid quiz on its own.
-    """
-    atc_lookup = load_atc_lookup()
-    db = load_db()
-
-    code_counts: Counter = Counter()
-    no_atc = 0
-    for m in db.molecules:
-        if m.atc_classifications:
-            seen: set = set()
-            for code in m.atc_classifications:
-                if len(code) >= 4:
-                    l3 = code[:4]
-                    if l3 not in seen:
-                        code_counts[l3] += 1
-                        seen.add(l3)
-        else:
-            no_atc += 1
-
-    label_to_code: dict[str, str] = {}
-    label_to_count: dict[str, int] = {}
-    for code, count in code_counts.items():
-        if count >= 4:
-            label = atc_lookup.get(code)
-            if label:
-                label_to_code[label] = code
-                label_to_count[label] = count
-
-    sorted_labels = sorted(label_to_count, key=lambda l: -label_to_count[l])
-    return sorted_labels, label_to_code, label_to_count, no_atc
-
-
 def build_filtered_db() -> MoleculeDB:
-    db = load_db()
-    _, label_to_code, _, _ = compute_l3_data()
-
-    selected_labels: list[str] = st.session_state.get(_k("l3_select"), [])
-    include_none: bool = st.session_state.get(_k("atc_none"), True)
-
-    if not selected_labels:
-        # No class filter — include everything (or drop unclassified if unchecked)
-        if include_none:
-            return db
-        return db.subset([m for m in db.molecules if m.atc_classifications])
-
-    selected_codes = {label_to_code[l] for l in selected_labels if l in label_to_code}
-    mols = []
-    for m in db.molecules:
-        if m.atc_classifications:
-            if any(len(c) >= 4 and c[:4] in selected_codes for c in m.atc_classifications if c):
-                mols.append(m)
-        elif include_none:
-            mols.append(m)
-    return db.subset(mols)
+    return build_filtered_drug_db(P)
 
 
 def start_quiz(quiz_type: str):
@@ -246,8 +187,8 @@ def show_quiz():
                 submitted = st.form_submit_button("Check", type="primary",
                                                   use_container_width=True, disabled=answered)
             if submitted and guess.strip() and not answered:
-                ratio = difflib.SequenceMatcher(None, _norm(guess), _norm(correct_name)).ratio()
-                if _norm(guess) == _norm(correct_name):
+                ratio = difflib.SequenceMatcher(None, norm_name(guess), norm_name(correct_name)).ratio()
+                if norm_name(guess) == norm_name(correct_name):
                     st.session_state[_k("answered")] = True
                     st.session_state[_k("total")] += 1
                     st.session_state[_k("correct_last")] = True
@@ -339,21 +280,7 @@ def show_quiz():
 # Main area: result
 # ---------------------------------------------------------------------------
 def show_result():
-    st.title("Quiz Complete!")
-    score = st.session_state[_k("score")]
-    total = st.session_state[_k("total")]
-    pct = round(100 * score / total) if total > 0 else 0
-    st.metric("Final Score", f"{score}/{total}", f"{pct}%")
-
-    if pct >= 80:
-        st.success("Great job!")
-    elif pct >= 50:
-        st.info("Good effort — keep practicing.")
-    else:
-        st.warning("Keep studying — you'll get there!")
-
-    if st.button("Back to Menu", type="primary"):
-        reset_to_menu()
+    show_quiz_result(st.session_state[_k("score")], st.session_state[_k("total")], reset_to_menu)
 
 
 # ---------------------------------------------------------------------------

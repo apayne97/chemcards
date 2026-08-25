@@ -1,26 +1,6 @@
 import streamlit as st
 import pandas as pd
-from utils import load_db, load_atc_lookup, render_smiles
-
-ATC_L1 = {
-    "A": "Alimentary tract & metabolism",
-    "B": "Blood & blood-forming organs",
-    "C": "Cardiovascular system",
-    "D": "Dermatologicals",
-    "G": "Genito-urinary system & sex hormones",
-    "H": "Systemic hormonal preparations",
-    "J": "Antiinfectives (systemic)",
-    "L": "Antineoplastic & immunomodulating",
-    "M": "Musculoskeletal system",
-    "N": "Nervous system",
-    "P": "Antiparasitic products",
-    "R": "Respiratory system",
-    "S": "Sensory organs",
-    "V": "Various",
-}
-
-LEVEL_CHARS = [1, 3, 4, 5]
-LEVEL_NAMES = ["Organ System", "Therapeutic Area", "Pharmacological Class", "Chemical Class"]
+from utils import load_db, load_atc_lookup, render_smiles, ATC_L1, LEVEL_CHARS, ATC_LEVEL_NAMES
 
 st.title("💊 Drug Glossary")
 
@@ -75,7 +55,7 @@ def _atc_levels(m) -> dict[str, str]:
         return {}
     primary = max(codes, key=len)
     levels = {}
-    for n_chars, name in zip(LEVEL_CHARS, LEVEL_NAMES):
+    for n_chars, name in zip(LEVEL_CHARS, ATC_LEVEL_NAMES):
         if len(primary) >= n_chars:
             prefix = primary[:n_chars]
             levels[name] = atc_lookup.get(prefix) or ATC_L1.get(prefix, prefix)
@@ -130,7 +110,7 @@ else:
                 st.markdown(f"**Mechanism:** {m.mechanism_of_action}")
             if lvl:
                 st.markdown("**ATC classification:**")
-                for name in LEVEL_NAMES:
+                for name in ATC_LEVEL_NAMES:
                     if name in lvl:
                         st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{name}: {lvl[name]}")
             if m.molecule_chembl_id and m.molecule_chembl_id != "unknown":

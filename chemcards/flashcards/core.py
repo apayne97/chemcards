@@ -1,15 +1,5 @@
-from pydantic import BaseModel
-from enum import Enum
 from chemcards.database.core import MoleculeDB
 from abc import abstractmethod
-
-
-class FlashcardType(Enum):
-    pass
-
-
-class FlashCardBase(BaseModel):
-    pass
 
 
 class FilterBase:
@@ -43,8 +33,5 @@ class FlashCardGeneratorBase:
         return molecule_db
 
     @abstractmethod
-    def next(self) -> FlashCardBase:
+    def next(self):
         pass
-
-    def __iter__(self):
-        return self.next()
