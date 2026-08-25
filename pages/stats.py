@@ -3,24 +3,7 @@ import plotly.express as px
 import pandas as pd
 from collections import Counter
 
-from utils import load_db, load_atc_lookup
-
-ATC_L1 = {
-    "A": "Alimentary tract & metabolism",
-    "B": "Blood & blood-forming organs",
-    "C": "Cardiovascular system",
-    "D": "Dermatologicals",
-    "G": "Genito-urinary system & sex hormones",
-    "H": "Systemic hormonal preparations",
-    "J": "Antiinfectives (systemic)",
-    "L": "Antineoplastic & immunomodulating",
-    "M": "Musculoskeletal system",
-    "N": "Nervous system",
-    "P": "Antiparasitic products",
-    "R": "Respiratory system",
-    "S": "Sensory organs",
-    "V": "Various",
-}
+from utils import load_db, load_atc_lookup, ATC_L1
 
 
 @st.cache_data

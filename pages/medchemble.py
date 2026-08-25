@@ -12,25 +12,14 @@ import streamlit as st
 from rdkit import Chem
 
 from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, FunctionalGroup
-from utils import render_fg
+from utils import (
+    render_fg, norm_name, tile_html, FG_CATEGORY_LABELS,
+    fg_all_categories, fg_counts_by_category,
+    build_filtered_fgs as _build_filtered_fgs,
+)
 
 MAX_GUESSES = 6
 P = "fgwordle_"
-
-CATEGORY_LABELS = {
-    "amide_derivatives": "Amide derivatives",
-    "carbonyl_derivatives": "Carbonyl derivatives",
-    "halogenated": "Halogenated",
-    "hydrocarbon": "Hydrocarbon",
-    "multiple_heteroatom_acyclic": "Multi-heteroatom acyclic",
-    "multiple_heteroatom_heterocycles": "Multi-heteroatom heterocycles",
-    "nitrogen_functionalities": "Nitrogen functionalities",
-    "nitrogen_heterocycles": "Nitrogen heterocycles",
-    "oxygen_functionalities": "Oxygen functionalities",
-    "oxygen_heterocycles": "Oxygen heterocycles",
-    "sulfur_functionalities": "Sulfur functionalities",
-    "sulfur_heterocycles": "Sulfur heterocycles",
-}
 
 TILE_DEFS = [
     ("category", "Category"),
@@ -45,28 +34,12 @@ def _k(key):
     return P + key
 
 
-def _norm(s: str) -> str:
-    return "".join(s.lower().split()).replace("-", "").replace(",", "")
-
-
 def _date_seed() -> int:
     return int(datetime.date.today().strftime("%Y%m%d"))
 
 
-def _all_categories() -> list[str]:
-    return sorted({fg.category for fg in FUNCTIONAL_GROUPS if fg.category})
-
-
-def _counts_by_category() -> dict[str, int]:
-    from collections import Counter
-    return Counter(fg.category for fg in FUNCTIONAL_GROUPS if fg.category)
-
-
 def build_filtered_fgs() -> list[FunctionalGroup]:
-    return [
-        fg for fg in FUNCTIONAL_GROUPS
-        if fg.category and st.session_state.get(_k(f"cat_{fg.category}"), True)
-    ]
+    return _build_filtered_fgs(P)
 
 
 def fg_properties(fg: FunctionalGroup) -> dict:
@@ -83,10 +56,10 @@ def fg_properties(fg: FunctionalGroup) -> dict:
 
 
 def find_fg(query: str, pool: list[FunctionalGroup]) -> FunctionalGroup | None:
-    q_norm = _norm(query)
+    q_norm = norm_name(query)
     best_ratio, best_fg = 0.0, None
     for fg in pool:
-        ratio = difflib.SequenceMatcher(None, q_norm, _norm(fg.name)).ratio()
+        ratio = difflib.SequenceMatcher(None, q_norm, norm_name(fg.name)).ratio()
         if ratio > best_ratio:
             best_ratio, best_fg = ratio, fg
     return best_fg if best_ratio >= 0.5 else None
@@ -101,7 +74,7 @@ def compare_fg(guess_fg: FunctionalGroup, target_fg: FunctionalGroup) -> list[di
         t_val = tp.get(prop)
         match = g_val == t_val
         if prop == "category":
-            display = CATEGORY_LABELS.get(g_val, str(g_val)) if g_val else "—"
+            display = FG_CATEGORY_LABELS.get(g_val, str(g_val)) if g_val else "—"
         else:
             display = "Yes" if g_val else "No"
         results.append({"level": label, "match": match, "label": display})
@@ -119,7 +92,7 @@ def init_state():
         "is_daily": False,
     }.items():
         st.session_state.setdefault(_k(key), val)
-    for cat in _all_categories():
+    for cat in fg_all_categories():
         st.session_state.setdefault(_k(f"cat_{cat}"), True)
 
 
@@ -150,8 +123,8 @@ def new_game():
 # Sidebar
 # ---------------------------------------------------------------------------
 def show_sidebar():
-    cats = _all_categories()
-    counts = _counts_by_category()
+    cats = fg_all_categories()
+    counts = fg_counts_by_category()
     with st.sidebar:
         st.button("📅 Today's Functional Group", type="primary", use_container_width=True, on_click=daily_game)
         st.button("🎲 Random Functional Group", use_container_width=True, on_click=new_game)
@@ -167,7 +140,7 @@ def show_sidebar():
                 st.session_state[_k(f"cat_{cat}")] = False
             st.rerun()
         for cat in cats:
-            label = CATEGORY_LABELS.get(cat, cat.replace("_", " ").title())
+            label = FG_CATEGORY_LABELS.get(cat, cat.replace("_", " ").title())
             st.checkbox(f"{label} ({counts[cat]})", key=_k(f"cat_{cat}"))
         st.divider()
         pool_size = len(build_filtered_fgs())
@@ -177,18 +150,6 @@ def show_sidebar():
 # ---------------------------------------------------------------------------
 # Tile rendering
 # ---------------------------------------------------------------------------
-def _tile_html(label: str, match: bool, level: str) -> str:
-    bg = "#538d4e" if match else "#3a3a3c"
-    return (
-        f"<div style='background:{bg};color:white;border-radius:6px;padding:8px 6px;"
-        f"text-align:center;margin:2px;min-height:60px;display:flex;"
-        f"flex-direction:column;justify-content:center;'>"
-        f"<div style='font-size:0.65em;opacity:0.75;margin-bottom:2px;'>{level}</div>"
-        f"<div style='font-size:0.8em;font-weight:600;'>{label}</div>"
-        f"</div>"
-    )
-
-
 def render_guess_row(guess_dict: dict):
     fg: FunctionalGroup = guess_dict["fg"]
     comparison: list[dict] = guess_dict["comparison"]
@@ -197,7 +158,7 @@ def render_guess_row(guess_dict: dict):
     st.markdown(label)
     cols = st.columns(5)
     for col, result in zip(cols, comparison):
-        col.markdown(_tile_html(result["label"], result["match"], result["level"]),
+        col.markdown(tile_html(result["label"], result["match"], result["level"]),
                      unsafe_allow_html=True)
     st.markdown("")
 
@@ -255,9 +216,10 @@ def show_game():
                     st.warning("No matching functional group found.")
                 else:
                     comparison = compare_fg(matched, target)
-                    exact = _norm(matched.name) == _norm(target.name)
+                    exact = norm_name(matched.name) == norm_name(target.name)
                     guesses.append({"input": guess_input, "fg": matched,
                                     "comparison": comparison, "exact": exact})
+                    st.session_state[_k("guesses")] = guesses
                     if exact:
                         st.session_state[_k("game_status")] = "won"
                     elif len(guesses) >= MAX_GUESSES:
@@ -281,7 +243,7 @@ def show_game():
 
 def _show_answer_details(fg: FunctionalGroup):
     with st.expander("Details"):
-        cat_label = CATEGORY_LABELS.get(fg.category, fg.category or "—") if fg.category else "—"
+        cat_label = FG_CATEGORY_LABELS.get(fg.category, fg.category or "—") if fg.category else "—"
         st.markdown(f"**Category:** {cat_label}")
         st.code(fg.smarts, language=None)
 

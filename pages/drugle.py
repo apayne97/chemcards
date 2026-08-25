@@ -11,41 +11,20 @@ import datetime
 import difflib
 import random
 import streamlit as st
-from collections import Counter
 
 from chemcards.database.core import MoleculeDB, MoleculeEntry
-from utils import load_db, load_atc_lookup, render_smiles
+from utils import (
+    load_db, load_atc_lookup, render_smiles,
+    ATC_L1, LEVEL_CHARS, ATC_LEVEL_NAMES,
+    norm_name, tile_html, compute_l3_data, build_filtered_drug_db,
+)
 
 MAX_GUESSES = 6
 P = "drugle_"
 
-ATC_L1 = {
-    "A": "Alimentary tract & metabolism",
-    "B": "Blood & blood-forming organs",
-    "C": "Cardiovascular system",
-    "D": "Dermatologicals",
-    "G": "Genito-urinary system & sex hormones",
-    "H": "Systemic hormonal preparations",
-    "J": "Antiinfectives (systemic)",
-    "L": "Antineoplastic & immunomodulating",
-    "M": "Musculoskeletal system",
-    "N": "Nervous system",
-    "P": "Antiparasitic products",
-    "R": "Respiratory system",
-    "S": "Sensory organs",
-    "V": "Various",
-}
-
-LEVEL_CHARS = [1, 3, 4, 5]
-LEVEL_NAMES = ["Organ System", "Therapeutic Area", "Pharmacological Class", "Chemical Subgroup"]
-
 
 def _k(key):
     return P + key
-
-
-def _norm(s: str) -> str:
-    return "".join(s.lower().split()).replace("-", "").replace(",", "")
 
 
 def _date_seed() -> int:
@@ -55,53 +34,8 @@ def _date_seed() -> int:
 # ---------------------------------------------------------------------------
 # Data helpers
 # ---------------------------------------------------------------------------
-@st.cache_data
-def compute_l3_data() -> tuple[list[str], dict[str, str], dict[str, int], int]:
-    atc_lookup = load_atc_lookup()
-    db = load_db()
-    code_counts: Counter = Counter()
-    no_atc = 0
-    for m in db.molecules:
-        if m.atc_classifications:
-            seen: set = set()
-            for code in m.atc_classifications:
-                if len(code) >= 4:
-                    l3 = code[:4]
-                    if l3 not in seen:
-                        code_counts[l3] += 1
-                        seen.add(l3)
-        else:
-            no_atc += 1
-    label_to_code: dict[str, str] = {}
-    label_to_count: dict[str, int] = {}
-    for code, count in code_counts.items():
-        if count >= 4:
-            label = atc_lookup.get(code)
-            if label:
-                label_to_code[label] = code
-                label_to_count[label] = count
-    sorted_labels = sorted(label_to_count, key=lambda l: -label_to_count[l])
-    return sorted_labels, label_to_code, label_to_count, no_atc
-
-
 def build_filtered_db() -> MoleculeDB:
-    db = load_db()
-    _, label_to_code, _, _ = compute_l3_data()
-    selected_labels: list[str] = st.session_state.get(_k("l3_select"), [])
-    include_none: bool = st.session_state.get(_k("atc_none"), True)
-    if not selected_labels:
-        if include_none:
-            return db
-        return MoleculeDB(molecules=[m for m in db.molecules if m.atc_classifications])
-    selected_codes = {label_to_code[l] for l in selected_labels if l in label_to_code}
-    mols = []
-    for m in db.molecules:
-        if m.atc_classifications:
-            if any(len(c) >= 4 and c[:4] in selected_codes for c in m.atc_classifications if c):
-                mols.append(m)
-        elif include_none:
-            mols.append(m)
-    return MoleculeDB(molecules=mols)
+    return build_filtered_drug_db(P)
 
 
 def playable_pool(db: MoleculeDB) -> list[MoleculeEntry]:
@@ -117,10 +51,10 @@ def best_atc(mol: MoleculeEntry) -> str | None:
 
 def find_molecule(query: str, db: MoleculeDB) -> MoleculeEntry | None:
     """Fuzzy-match a typed name to the closest molecule in the full DB."""
-    q_norm = _norm(query)
+    q_norm = norm_name(query)
     best_ratio, best_mol = 0.0, None
     for m in db.molecules:
-        ratio = difflib.SequenceMatcher(None, q_norm, _norm(m.name)).ratio()
+        ratio = difflib.SequenceMatcher(None, q_norm, norm_name(m.name)).ratio()
         if ratio > best_ratio:
             best_ratio, best_mol = ratio, m
     return best_mol if best_ratio >= 0.5 else None
@@ -131,7 +65,7 @@ def compare_atc(guess_mol: MoleculeEntry, target_mol: MoleculeEntry,
     target_code = best_atc(target_mol)
     guess_code = best_atc(guess_mol)
     results = []
-    for n_chars, name in zip(LEVEL_CHARS, LEVEL_NAMES):
+    for n_chars, name in zip(LEVEL_CHARS, ATC_LEVEL_NAMES):
         t_prefix = target_code[:n_chars] if target_code and len(target_code) >= n_chars else None
         g_prefix = guess_code[:n_chars] if guess_code and len(guess_code) >= n_chars else None
         match = t_prefix is not None and g_prefix is not None and t_prefix == g_prefix
@@ -210,18 +144,6 @@ def show_sidebar():
 # ---------------------------------------------------------------------------
 # Tile rendering
 # ---------------------------------------------------------------------------
-def _tile_html(label: str, match: bool, level: str) -> str:
-    bg = "#538d4e" if match else "#3a3a3c"
-    return (
-        f"<div style='background:{bg};color:white;border-radius:6px;padding:8px 6px;"
-        f"text-align:center;margin:2px;min-height:60px;display:flex;"
-        f"flex-direction:column;justify-content:center;'>"
-        f"<div style='font-size:0.65em;opacity:0.75;margin-bottom:2px;'>{level}</div>"
-        f"<div style='font-size:0.75em;font-weight:600;line-height:1.2;'>{label}</div>"
-        f"</div>"
-    )
-
-
 def render_guess_row(guess_dict: dict):
     mol: MoleculeEntry = guess_dict["mol"]
     comparison: list[dict] = guess_dict["comparison"]
@@ -231,8 +153,8 @@ def render_guess_row(guess_dict: dict):
     st.markdown(label)
     cols = st.columns(4)
     for col, result in zip(cols, comparison):
-        tile = _tile_html(result["label"], result["match"], result["level"])
-        col.markdown(tile, unsafe_allow_html=True)
+        col.markdown(tile_html(result["label"], result["match"], result["level"]),
+                     unsafe_allow_html=True)
     st.markdown("")
 
 
@@ -290,9 +212,10 @@ def show_game():
                     st.warning("No matching drug found — try a different spelling.")
                 else:
                     comparison = compare_atc(matched, target, atc_lookup)
-                    exact = _norm(matched.name) == _norm(target.name)
+                    exact = norm_name(matched.name) == norm_name(target.name)
                     guesses.append({"input": guess_input, "mol": matched,
                                     "comparison": comparison, "exact": exact})
+                    st.session_state[_k("guesses")] = guesses
                     if exact:
                         st.session_state[_k("game_status")] = "won"
                     elif len(guesses) >= MAX_GUESSES:

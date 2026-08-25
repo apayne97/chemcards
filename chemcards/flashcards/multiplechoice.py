@@ -1,14 +1,14 @@
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from chemcards.database.core import MoleculeEntry
-from chemcards.flashcards.core import FlashCardBase, FlashCardGeneratorBase
+from chemcards.flashcards.core import FlashCardGeneratorBase
 import random
 from abc import abstractmethod
 from typing import Optional, Union
 from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, FunctionalGroup
 
 
-class MultipleChoice(FlashCardBase):
+class MultipleChoice(BaseModel):
     question: str
     display: Optional[Union[MoleculeEntry, FunctionalGroup]] = Field(
         None, description="Molecule or functional group to display if required"
@@ -78,22 +78,3 @@ class MultipleChoiceNameToMoleculeGenerator(FlashCardGeneratorBase):
         )
 
 
-class MultipleChoiceMoleculeToFunctionalGroupNameGenerator(FlashCardGeneratorBase):
-
-    name = "Multiple Choice - Functional Group (SMARTS) to Name"
-
-    def next(self) -> MultipleChoice:
-        # Sample functional groups directly from the project's functional_groups.yaml
-        # Be robust if the data file has fewer than 4 entries
-        sample_count = min(4, len(FUNCTIONAL_GROUPS))
-        example_fgs = random.sample(FUNCTIONAL_GROUPS, sample_count)
-        correct = random.randrange(sample_count)
-        chosen = example_fgs[correct]
-        # Ask which name corresponds to the SMARTS pattern; display the functional group as a molecule
-        return MultipleChoice(
-            question=f"What is the name of this functional group?",
-            display=chosen,
-            choices=[fg.name for fg in example_fgs],
-            answer_index=correct,
-            answer_molecule=None,
-        )
