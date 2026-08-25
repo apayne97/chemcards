@@ -6,13 +6,6 @@ def cli():
     """ChemCards — chemistry flashcard app and database tools."""
 
 
-@cli.command()
-def start():
-    """Launch the tkinter GUI."""
-    from chemcards.gui.mainwindow import MainWindow
-    MainWindow().start()
-
-
 @cli.command("update-database")
 @click.option("--force", is_flag=True, default=False,
               help="Re-download raw ChEMBL data even if already cached.")
