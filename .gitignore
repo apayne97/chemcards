@@ -164,6 +164,3 @@ temp/
 *.json
 !chemcards/database/data/molecule_database.json
 !chemcards/database/data/chembl_atc_classes.json
-
-# macOS
-.DS_Store
