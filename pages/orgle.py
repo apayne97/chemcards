@@ -1,7 +1,7 @@
-"""MedChemble — Wordle-style chemical building block identification game.
+"""Orgle — Wordle-style functional group identification game.
 
-The player is shown a mystery chemical building block (as a SMARTS pattern)
-and must name it.  Each guess is matched to the closest building block in the
+The player is shown a mystery functional group (as a SMARTS pattern) and must
+name it.  Each guess is matched to the closest functional group in the
 database; five structural properties are shown as green / grey tiles:
 ring membership, aromaticity, and presence of N / O / S.
 """
@@ -11,7 +11,7 @@ import random
 import streamlit as st
 from rdkit import Chem
 
-from chemcards.database.cheminformatics import CHEMICAL_BUILDING_BLOCKS, FunctionalGroup
+from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, FunctionalGroup
 from utils import (
     render_fg, norm_name, tile_html, tag_label,
     all_tags, counts_by_tag,
@@ -19,7 +19,7 @@ from utils import (
 )
 
 MAX_GUESSES = 6
-P = "cbbwordle_"
+P = "orgle_"
 
 TILE_DEFS = [
     ("is_ring", "Ring"),
@@ -38,12 +38,12 @@ def _date_seed() -> int:
     return int(datetime.date.today().strftime("%Y%m%d"))
 
 
-def build_filtered_cbbs() -> list[FunctionalGroup]:
-    return build_filtered_by_tags(CHEMICAL_BUILDING_BLOCKS, P)
+def build_filtered_fgs() -> list[FunctionalGroup]:
+    return build_filtered_by_tags(FUNCTIONAL_GROUPS, P)
 
 
-def cbb_properties(cbb: FunctionalGroup) -> dict:
-    mol = Chem.MolFromSmarts(cbb.smarts)
+def fg_properties(fg: FunctionalGroup) -> dict:
+    mol = Chem.MolFromSmarts(fg.smarts)
     atoms = [a.GetAtomicNum() for a in mol.GetAtoms() if a.GetAtomicNum() > 0] if mol else []
     aromatic = any(a.GetIsAromatic() for a in mol.GetAtoms()) if mol else False
     is_ring = len(Chem.GetSSSR(mol)) > 0 if mol else False
@@ -56,19 +56,19 @@ def cbb_properties(cbb: FunctionalGroup) -> dict:
     }
 
 
-def find_cbb(query: str, pool: list[FunctionalGroup]) -> FunctionalGroup | None:
+def find_fg(query: str, pool: list[FunctionalGroup]) -> FunctionalGroup | None:
     q_norm = norm_name(query)
-    best_ratio, best_cbb = 0.0, None
-    for cbb in pool:
-        ratio = difflib.SequenceMatcher(None, q_norm, norm_name(cbb.name)).ratio()
+    best_ratio, best_fg = 0.0, None
+    for fg in pool:
+        ratio = difflib.SequenceMatcher(None, q_norm, norm_name(fg.name)).ratio()
         if ratio > best_ratio:
-            best_ratio, best_cbb = ratio, cbb
-    return best_cbb if best_ratio >= 0.5 else None
+            best_ratio, best_fg = ratio, fg
+    return best_fg if best_ratio >= 0.5 else None
 
 
-def compare_cbb(guess_cbb: FunctionalGroup, target_cbb: FunctionalGroup) -> list[dict]:
-    gp = cbb_properties(guess_cbb)
-    tp = cbb_properties(target_cbb)
+def compare_fg(guess_fg: FunctionalGroup, target_fg: FunctionalGroup) -> list[dict]:
+    gp = fg_properties(guess_fg)
+    tp = fg_properties(target_fg)
     results = []
     for prop, label in TILE_DEFS:
         g_val = gp.get(prop)
@@ -90,14 +90,14 @@ def init_state():
         "is_daily": False,
     }.items():
         st.session_state.setdefault(_k(key), val)
-    for tag in all_tags(CHEMICAL_BUILDING_BLOCKS):
+    for tag in all_tags(FUNCTIONAL_GROUPS):
         st.session_state.setdefault(_k(f"tag_{tag}"), True)
 
 
 def daily_game():
-    full_pool = [cbb for cbb in CHEMICAL_BUILDING_BLOCKS if cbb.tags]
+    full_pool = [fg for fg in FUNCTIONAL_GROUPS if fg.tags]
     if not full_pool:
-        st.error("No chemical building blocks available.")
+        st.error("No functional groups available.")
         return
     target = random.Random(_date_seed()).choice(full_pool)
     st.session_state[_k("target")] = target
@@ -107,9 +107,9 @@ def daily_game():
 
 
 def new_game():
-    pool = build_filtered_cbbs()
+    pool = build_filtered_fgs()
     if len(pool) < 2:
-        st.error("Need at least 2 chemical building blocks — select more tags.")
+        st.error("Need at least 2 functional groups — select more tags.")
         return
     st.session_state[_k("target")] = random.choice(pool)
     st.session_state[_k("guesses")] = []
@@ -121,13 +121,13 @@ def new_game():
 # Sidebar
 # ---------------------------------------------------------------------------
 def show_sidebar():
-    tags = all_tags(CHEMICAL_BUILDING_BLOCKS)
-    counts = counts_by_tag(CHEMICAL_BUILDING_BLOCKS)
+    tags = all_tags(FUNCTIONAL_GROUPS)
+    counts = counts_by_tag(FUNCTIONAL_GROUPS)
     with st.sidebar:
-        st.button("📅 Today's Building Block", type="primary", use_container_width=True, on_click=daily_game)
-        st.button("🎲 Random Building Block", use_container_width=True, on_click=new_game)
+        st.button("📅 Today's Functional Group", type="primary", use_container_width=True, on_click=daily_game)
+        st.button("🎲 Random Functional Group", use_container_width=True, on_click=new_game)
         st.divider()
-        st.markdown("### 🧱 Building Block Tags")
+        st.markdown("### ⚗️ Functional Group Tags")
         c1, c2 = st.columns(2)
         if c1.button("All", key=_k("btn_all"), use_container_width=True):
             for tag in tags:
@@ -140,18 +140,18 @@ def show_sidebar():
         for tag in tags:
             st.checkbox(f"{tag_label(tag)} ({counts[tag]})", key=_k(f"tag_{tag}"))
         st.divider()
-        pool_size = len(build_filtered_cbbs())
-        st.caption(f"{pool_size} chemical building blocks in random pool")
+        pool_size = len(build_filtered_fgs())
+        st.caption(f"{pool_size} functional groups in random pool")
 
 
 # ---------------------------------------------------------------------------
 # Tile rendering
 # ---------------------------------------------------------------------------
 def render_guess_row(guess_dict: dict):
-    cbb: FunctionalGroup = guess_dict["cbb"]
+    fg: FunctionalGroup = guess_dict["fg"]
     comparison: list[dict] = guess_dict["comparison"]
     exact: bool = guess_dict["exact"]
-    label = f"**{cbb.name}**" + (" ✓" if exact else "")
+    label = f"**{fg.name}**" + (" ✓" if exact else "")
     st.markdown(label)
     cols = st.columns(5)
     for col, result in zip(cols, comparison):
@@ -164,18 +164,18 @@ def render_guess_row(guess_dict: dict):
 # Main game area
 # ---------------------------------------------------------------------------
 def show_idle():
-    st.title("🧱 MedChemble")
+    st.title("⚗️ Orgle")
     st.markdown(
-        "A Wordle-style chemical building block identification game. A mystery SMARTS pattern "
-        "is shown — guess the building block name. Each guess shows five structural properties as "
+        "A Wordle-style organic chemistry game. A mystery SMARTS pattern is shown — "
+        "guess the functional group name. Each guess shows five structural properties as "
         "green (match) or grey (no match) tiles: **Ring**, **Aromatic**, **N**, **O**, **S**."
     )
     st.divider()
     col1, col2 = st.columns(2)
     with col1:
-        st.button("📅 Today's Building Block", type="primary", use_container_width=True, on_click=daily_game)
+        st.button("📅 Today's Functional Group", type="primary", use_container_width=True, on_click=daily_game)
     with col2:
-        st.button("🎲 Random Building Block", use_container_width=True, on_click=new_game)
+        st.button("🎲 Random Functional Group", use_container_width=True, on_click=new_game)
 
 
 def show_game():
@@ -184,11 +184,11 @@ def show_game():
     status: str = st.session_state[_k("game_status")]
     is_daily: bool = st.session_state.get(_k("is_daily"), False)
     n_guesses = len(guesses)
-    all_cbbs = CHEMICAL_BUILDING_BLOCKS
+    all_fgs = FUNCTIONAL_GROUPS
 
     title_suffix = " · 📅 Daily" if is_daily else ""
-    st.title(f"🧱 MedChemble{title_suffix}")
-    st.caption(f"Guess {n_guesses}/{MAX_GUESSES} · Identify the chemical building block")
+    st.title(f"⚗️ Orgle{title_suffix}")
+    st.caption(f"Guess {n_guesses}/{MAX_GUESSES} · Identify the functional group")
     st.divider()
 
     img = render_fg(target, size=300)
@@ -203,18 +203,18 @@ def show_game():
 
         if status == "playing":
             with st.form(key=_k(f"guess_form_{n_guesses}"), clear_on_submit=True):
-                guess_input = st.text_input("Building block name:",
-                                            placeholder="e.g. indole")
+                guess_input = st.text_input("Functional group name:",
+                                            placeholder="e.g. amide")
                 submitted = st.form_submit_button("Guess", type="primary",
                                                   use_container_width=True)
             if submitted and guess_input.strip():
-                matched = find_cbb(guess_input.strip(), all_cbbs)
+                matched = find_fg(guess_input.strip(), all_fgs)
                 if matched is None:
-                    st.warning("No matching chemical building block found.")
+                    st.warning("No matching functional group found.")
                 else:
-                    comparison = compare_cbb(matched, target)
+                    comparison = compare_fg(matched, target)
                     exact = norm_name(matched.name) == norm_name(target.name)
-                    guesses.append({"input": guess_input, "cbb": matched,
+                    guesses.append({"input": guess_input, "fg": matched,
                                     "comparison": comparison, "exact": exact})
                     st.session_state[_k("guesses")] = guesses
                     if exact:
@@ -228,21 +228,21 @@ def show_game():
                 st.rerun()
 
         elif status == "won":
-            st.success(f"🎉 Correct! The chemical building block was **{target.name}**.")
+            st.success(f"🎉 Correct! The functional group was **{target.name}**.")
             _show_answer_details(target)
-            st.button("🎲 New Random Building Block", type="primary", use_container_width=True, on_click=new_game)
+            st.button("🎲 New Random Functional Group", type="primary", use_container_width=True, on_click=new_game)
 
         elif status == "lost":
-            st.error(f"The chemical building block was **{target.name}**.")
+            st.error(f"The functional group was **{target.name}**.")
             _show_answer_details(target)
-            st.button("🎲 New Random Building Block", type="primary", use_container_width=True, on_click=new_game)
+            st.button("🎲 New Random Functional Group", type="primary", use_container_width=True, on_click=new_game)
 
 
-def _show_answer_details(cbb: FunctionalGroup):
+def _show_answer_details(fg: FunctionalGroup):
     with st.expander("Details"):
-        if cbb.tags:
-            st.markdown(f"**Tags:** {', '.join(tag_label(t) for t in cbb.tags)}")
-        st.code(cbb.smarts, language=None)
+        if fg.tags:
+            st.markdown(f"**Tags:** {', '.join(tag_label(t) for t in fg.tags)}")
+        st.code(fg.smarts, language=None)
 
 
 # ---------------------------------------------------------------------------

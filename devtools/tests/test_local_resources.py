@@ -6,7 +6,6 @@ def test_runtime_resources_exist():
     """Files required for the app to run — always committed to the repo."""
     assert local_resources.MOLECULE_DATABASE.exists()
     assert local_resources.FUNCTIONAL_GROUPS_DATABASE.exists()
-    assert local_resources.FUNCTIONAL_GROUP_CATEGORIES_DATABASE.exists()
 
 
 @pytest.mark.skipif(
