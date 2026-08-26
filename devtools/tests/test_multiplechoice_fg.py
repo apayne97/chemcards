@@ -34,6 +34,7 @@ def test_molecule_to_target_generator(db):
     assert len(q.choices) == 4
     assert 0 <= q.answer_index < 4
     assert q.answer == q.choices[q.answer_index]
+    assert len(set(q.choices)) == 4  # no duplicate targets among the answer choices
 
 
 def test_molecule_to_name_generator(db):
