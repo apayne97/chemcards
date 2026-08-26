@@ -1,204 +1,280 @@
 - name: acid halide
   category: carbonyl_derivatives
+  kind: functional_group
   smarts: "[F,Cl,Br][CX3](=[OX1])[#1,*&!$([OH1])&!$([SH1])]"
   display_smiles: "[*:1]C(=O)Cl"
 - name: acylimidazole
   category: multiple_heteroatom_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts:  "[#6][CX3](=[OX1])n1cncc1"
   display_smiles: "[*:1]C(=O)n1ccnc1"
 - name: para-quinone
   category: carbonyl_derivatives
+  kind: functional_group
   smarts: "[#6X3]1=,:[#6X3]-,:[#6X3](=[OX1])-,:[#6X3]=,:[#6X3]-,:[#6X3]1(=[OX1])"
   display_smiles: "O=C1C=CC(=O)C=C1"
 - name: ortho-quinone
   category: carbonyl_derivatives
+  kind: functional_group
   smarts: "[#6X3]1(=[OX1])-,:[#6X3](=[OX1])-,:[#6X3]=,:[#6X3]-,:[#6X3]=,:[#6X3]1"
   display_smiles: "O=C1C(=O)C=CC=C1"
 - name: thiophene
   category: sulfur_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "c1ccc[sX2]1"
   display_smiles: "c1cccs1"
 - name: furan
   category: oxygen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "o1cccc1"
   display_smiles: "c1ccco1"
 - name: pyrrole
   category: nitrogen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "[nH]1cccc1"
   display_smiles: "c1cc[nH]c1"
 - name: imidazole
   category: nitrogen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "c1c[nH]cn1"
   display_smiles: "c1c[nH]cn1"
 - name: pyrazole
   category: nitrogen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "c1cc[nH]n1"
   display_smiles: "c1cc[nH]n1"
 - name: triazole
   category: nitrogen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "[$(n1ncnc1),$(n1nncc1)]"
   display_smiles: "c1nc[nH]n1"
 - name: pyrimidine
   category: nitrogen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "n1cnccc1"
   display_smiles: "c1ccncn1"
 - name: pyridazine
   category: nitrogen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "n1ncccc1"
   display_smiles: "c1ccnnc1"
 - name: pyrazine
   category: nitrogen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "n1ccncc1"
   display_smiles: "c1cnccn1"
 - name: oxazole
   category: multiple_heteroatom_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "[$(o1cncc1),$(o1nccc1)]"
   display_smiles: "c1cnco1"
 - name: thiazole
   category: multiple_heteroatom_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "[$(s1cncc1),$(s1nccc1)]"
   display_smiles: "c1cncs1"
 - name: pyridine
   category: nitrogen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "n1ccccc1"
   display_smiles: "c1ccncc1"
 - name: indole
   category: nitrogen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "c1ccc2nccc2c1"
   display_smiles: "c1ccc2[nH]ccc2c1"
 - name: phenothiazine
   category: multiple_heteroatom_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "*-[#7]-1-c2ccccc2-[#16]-c2ccccc-12"
   display_smiles: "c1ccc2c(c1)Nc1ccccc1S2"
 - name: acyl hydrazine
   category: multiple_heteroatom_acyclic
+  kind: functional_group
   smarts: "[N;R0][N;R0]C(=O)"
   display_smiles: "[*:1]NNC(=O)[*:2]"
 - name: imine
   category: nitrogen_functionalities
+  kind: functional_group
   smarts: "[#1,#6][CX3](=[NX2][#1,#6&!$([CX3]=[OX1,SX1,NX2])])[#1,#6]"
   display_smiles: "[*:1]C=N[*:2]"
 - name: acid anhydride
   category: carbonyl_derivatives
+  kind: functional_group
   smarts: "[CX3](=[OX1])[OX2][CX3](=[OX1])"
   display_smiles: "[*:1]C(=O)OC(=O)[*:2]"
 - name: beta-keto anhydride
   category: carbonyl_derivatives
+  kind: functional_group
   smarts: "[C,c](=O)[CX4,CR0X3,O][C,c](=O)"
   display_smiles: "[*:1]C(=O)CC(=O)[*:2]"
 - name: beta-lactam
   category: amide_derivatives
+  kind: functional_group
   smarts: "[NX3]1[CX4][CX4][CX3]1(=[OX1])"
   display_smiles: "O=C1CCN1"
 - name: morpholine
   category: multiple_heteroatom_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "O1CC[NH1]CC1"
   display_smiles: "C1CNCCO1"
 - name: phenyl acetamide
   category: amide_derivatives
+  kind: functional_group
   smarts: "CC(=O)NC1=CC=CC=C1"
   display_smiles: "CC(=O)Nc1ccccc1"
 - name: sulfonamide
   category: sulfur_functionalities
+  kind: functional_group
   smarts: "CS(=O)(=O)N"
   display_smiles: "[*:1]S(=O)(=O)N"
 - name: alkane
   category: hydrocarbon
+  kind: functional_group
   smarts: "[CX4][CX4]"
   display_smiles: "[*:1]CC[*:2]"
 - name: alkene
   category: hydrocarbon
+  kind: functional_group
   smarts: "[CX3]=[CX3]"
   display_smiles: "[*:1]C=C[*:2]"
 - name: alkyne
   category: hydrocarbon
+  kind: functional_group
   smarts: "[CX2]#[CX2]"
   display_smiles: "[*:1]C#C[*:2]"
 - name: methyl
   category: hydrocarbon
+  kind: functional_group
   smarts: "[CH3X4]"
   display_smiles: "C[*:1]"
 - name: ethyl
   category: hydrocarbon
+  kind: functional_group
   smarts: "[CH2X4][CH3X4]"
   display_smiles: "CC[*:1]"
 - name: ketone
   category: carbonyl_derivatives
+  kind: functional_group
   smarts: "[#6][CX3](=[OX1])[#6]"
   display_smiles: "[*:1]C(=O)[*:2]"
 - name: alcohol
   category: oxygen_functionalities
+  kind: functional_group
   smarts: "[CX4][OX2H]"
   display_smiles: "[*:1]O"
 - name: amine
   category: nitrogen_functionalities
+  kind: functional_group
   smarts: "[NX3;H2,H1;!$(NC=O)]"
   display_smiles: "[*:1]N"
 - name: ether
   category: oxygen_functionalities
+  kind: functional_group
   smarts: "[OD2]([#6])[#6]"
   display_smiles: "[*:1]O[*:2]"
 - name: ester
   category: carbonyl_derivatives
+  kind: functional_group
   smarts: "[#6][CX3](=[OX1])[OX2][#6]"
   display_smiles: "[*:1]C(=O)O[*:2]"
 - name: amide
   category: amide_derivatives
+  kind: functional_group
   smarts: "[#6][CX3](=[OX1])[NX3]"
   display_smiles: "[*:1]C(=O)N"
 - name: carboxylic acid
   category: carbonyl_derivatives
+  kind: functional_group
   smarts: "[#6][CX3](=[OX1])[OX2H1]"
   display_smiles: "[*:1]C(=O)O"
 - name: alkyl halide
   category: halogenated
+  kind: functional_group
   smarts: "[CX4][F,Cl,Br,I]"
   display_smiles: "[*:1]CCl"
 - name: aryl halide
   category: halogenated
+  kind: functional_group
   smarts: "[c][F,Cl,Br,I]"
   display_smiles: "Clc1ccccc1"
 - name: nitrile
   category: nitrogen_functionalities
+  kind: functional_group
   smarts: "[CX2]#[NX1]"
   display_smiles: "[*:1]C#N"
 - name: nitro
   category: nitrogen_functionalities
+  kind: functional_group
   smarts: "[NX3](=O)=O"
   display_smiles: "[*:1][N+](=O)[O-]"
 - name: thiol
   category: sulfur_functionalities
+  kind: functional_group
   smarts: "[#6][SX2H]"
   display_smiles: "[*:1]S"
 - name: disulfide
   category: sulfur_functionalities
+  kind: functional_group
   smarts: "[#6][SX2][SX2][#6]"
   display_smiles: "[*:1]SS[*:2]"
 - name: tetrahydrofuran
   category: oxygen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "C1COCC1"
   display_smiles: "C1COCC1"
 - name: tetrahydrothiophene
   category: sulfur_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "C1CSCC1"
   display_smiles: "C1CSCC1"
 - name: tetrahydropyran
   category: oxygen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "C1COCCC1"
   display_smiles: "C1COCCC1"
 - name: dioxane
   category: oxygen_heterocycles
+  kind: chemical_building_block
+  tags: [scaffold]
   smarts: "[$(O1CCOCC1),$(O1COCCC1)]"
   display_smiles: "C1COCOC1"
 - name: sulfide
   category: sulfur_functionalities
+  kind: functional_group
   smarts: "[#6][SX2][#6]"
   display_smiles: "[*:1]S[*:2]"
 - name: sulfoxide
   category: sulfur_functionalities
+  kind: functional_group
   smarts: "[#6][SX3](=[OX1])[#6]"
   display_smiles: "[*:1]S(=O)[*:2]"
 - name: sulfone
   category: sulfur_functionalities
+  kind: functional_group
   smarts: "[#6][SX4](=[OX1])(=[OX1])[#6]"
   display_smiles: "[*:1]S(=O)(=O)[*:2]"
+- name: urea
+  category: amide_derivatives
+  kind: functional_group
+  smarts: "[NX3][CX3](=[OX1])[NX3]"
+  display_smiles: "[*:1]NC(=O)N[*:2]"

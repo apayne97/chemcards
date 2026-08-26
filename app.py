@@ -22,6 +22,7 @@ pg = st.navigation({
     "Glossary": [
         st.Page("pages/drug_glossary.py", title="Drug Glossary", icon="📖"),
         st.Page("pages/fg_glossary.py", title="Functional Group Glossary", icon="📖"),
+        st.Page("pages/cbb_glossary.py", title="Chemical Building Blocks", icon="🧱"),
         st.Page("pages/feedback.py", title="Feedback", icon="📬"),
     ],
 })

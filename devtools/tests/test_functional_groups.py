@@ -60,3 +60,43 @@ class TestFunctionalGroupCategories:
             f"Category sequence: {[fg['category'] for fg in sorted_groups]}"
         )
 
+
+HETEROCYCLE_CATEGORIES = {
+    "nitrogen_heterocycles",
+    "oxygen_heterocycles",
+    "sulfur_heterocycles",
+    "multiple_heteroatom_heterocycles",
+}
+
+
+class TestFunctionalGroupVsChemicalBuildingBlockSplit:
+    def test_all_groups_have_a_kind(self, functional_groups):
+        missing = [fg["name"] for fg in functional_groups if not fg.get("kind")]
+        assert missing == [], f"Functional groups missing 'kind': {missing}"
+
+    def test_heterocycle_categories_are_chemical_building_blocks(self, functional_groups):
+        mismatched = [
+            fg["name"] for fg in functional_groups
+            if fg.get("category") in HETEROCYCLE_CATEGORIES
+            and fg.get("kind") != "chemical_building_block"
+        ]
+        assert mismatched == [], (
+            f"Heterocycle-category entries not tagged kind=chemical_building_block: {mismatched}"
+        )
+
+    def test_functional_groups_module_split_matches_yaml(self, functional_groups):
+        from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, CHEMICAL_BUILDING_BLOCKS
+
+        yaml_fg_names = {fg["name"] for fg in functional_groups if fg.get("kind") == "functional_group"}
+        yaml_cbb_names = {fg["name"] for fg in functional_groups if fg.get("kind") == "chemical_building_block"}
+
+        assert {fg.name for fg in FUNCTIONAL_GROUPS} == yaml_fg_names
+        assert {fg.name for fg in CHEMICAL_BUILDING_BLOCKS} == yaml_cbb_names
+        assert "urea" in yaml_fg_names
+
+    def test_chemical_building_blocks_are_tagged(self):
+        from chemcards.database.cheminformatics import CHEMICAL_BUILDING_BLOCKS
+
+        untagged = [cbb.name for cbb in CHEMICAL_BUILDING_BLOCKS if not cbb.tags]
+        assert untagged == [], f"Chemical building blocks missing tags: {untagged}"
+
