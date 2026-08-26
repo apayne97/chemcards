@@ -43,7 +43,7 @@ pip install -e .
 First, download the FDA-approved drug database from ChEMBL:
 
 ```bash
-chemcards download-database
+chemcards update-database
 ```
 
 This will:
@@ -71,6 +71,7 @@ Create a PDF catalog of all molecules:
 ```bash
 # Generate combined catalog (functional groups + FDA drugs)
 chemcards generate-catalog
+```
 
 Output files are saved to `chemcards/data/catalog_output/`
 
@@ -81,4 +82,3 @@ The application uses the following data files:
 - `database/data/functional_groups.yaml` - Functional group definitions (SMARTS + names)
 - `database/data/molecule_database.json` - FDA-approved drugs (auto-generated)
 - `database/data/manually_added_molecules.yaml` - Custom molecules
-```

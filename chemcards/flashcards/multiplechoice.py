@@ -36,7 +36,12 @@ class MultipleChoiceMoleculeToTargetGenerator(MultipleChoiceGeneratorBase):
     name = "Multiple Choice - Molecule to Target"
 
     def next(self) -> MultipleChoice:
-        example_molecules = random.sample(self.molecule_db.molecules, 4)
+        by_target: dict[str, list[MoleculeEntry]] = {}
+        for mol in self.molecule_db.molecules:
+            by_target.setdefault(mol.target, []).append(mol)
+
+        targets = random.sample(list(by_target.keys()), 4)
+        example_molecules = [random.choice(by_target[t]) for t in targets]
         correct = random.randint(0, 3)
         return MultipleChoice(
             question="What is the target of this molecule?",
