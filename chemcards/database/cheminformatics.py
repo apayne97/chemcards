@@ -7,7 +7,6 @@ from rdkit import Chem
 
 class FunctionalGroup(BaseModel):
     name: str
-    category: str = Field(None)
     kind: str = Field("functional_group")
     tags: list[str] = Field(default_factory=list)
     smarts: str
@@ -24,6 +23,11 @@ class FunctionalGroup(BaseModel):
     def to_rdkit(self) -> Chem.Mol:
         return Chem.MolFromSmarts(self.smarts)
 
+
+# Closed vocabulary for FunctionalGroup.tags — validated by devtools/tests/test_functional_groups.py
+# rather than a Pydantic Literal, since the chemical building blocks list is expected to keep
+# growing with new tags (amino_acid, nucleotide, metabolite, etc.) as content is added.
+CANONICAL_TAGS = {"heterocycle", "nitrogen", "oxygen", "sulfur", "carbonyl", "halogen", "hydrocarbon"}
 
 _ALL_FUNCTIONAL_GROUPS = [
     FunctionalGroup(**fg)

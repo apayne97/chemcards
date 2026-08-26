@@ -1,7 +1,7 @@
 import streamlit as st
 from rdkit.Chem import MolFromSmiles, MolFromSmarts
 from chemcards.database.cheminformatics import CHEMICAL_BUILDING_BLOCKS, FunctionalGroup
-from utils import render_fg, FG_CATEGORY_LABELS
+from utils import render_fg, all_tags
 
 
 def _atom_count(fg: FunctionalGroup) -> int:
@@ -15,12 +15,12 @@ st.caption(
     "group, but not a full drug."
 )
 
-all_tags = sorted({tag for cbb in CHEMICAL_BUILDING_BLOCKS for tag in cbb.tags})
+available_tags = all_tags(CHEMICAL_BUILDING_BLOCKS)
 
 with st.sidebar:
     st.markdown("### Filter")
     search = st.text_input("Search by name", "")
-    selected_tags = st.multiselect("Tags", options=all_tags, default=[], placeholder="All tags")
+    selected_tags = st.multiselect("Tags", options=available_tags, default=[], placeholder="All tags")
 
 cbbs = CHEMICAL_BUILDING_BLOCKS
 if search:
@@ -38,8 +38,6 @@ else:
             if img:
                 st.image(img)
             st.caption(f"**{cbb.name}**")
-            label = FG_CATEGORY_LABELS.get(cbb.category, cbb.category.replace("_", " ").title()) if cbb.category else "—"
-            st.caption(label)
             if cbb.tags:
                 for tag in cbb.tags:
                     st.badge(tag)

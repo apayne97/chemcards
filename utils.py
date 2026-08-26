@@ -8,7 +8,6 @@ from rdkit.Chem.Draw import rdMolDraw2D
 
 from chemcards.database.core import MoleculeDB
 from chemcards.database.resources import CHEMBL_ATC_DOWNLOAD
-from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS
 
 # ---------------------------------------------------------------------------
 # ATC constants
@@ -33,23 +32,9 @@ ATC_L1 = {
 LEVEL_CHARS = [1, 3, 4, 5]
 ATC_LEVEL_NAMES = ["Organ System", "Therapeutic Area", "Pharmacological Class", "Chemical Class"]
 
-# ---------------------------------------------------------------------------
-# Functional group constants
-# ---------------------------------------------------------------------------
-FG_CATEGORY_LABELS = {
-    "amide_derivatives": "Amide derivatives",
-    "carbonyl_derivatives": "Carbonyl derivatives",
-    "halogenated": "Halogenated",
-    "hydrocarbon": "Hydrocarbon",
-    "multiple_heteroatom_acyclic": "Multi-heteroatom acyclic",
-    "multiple_heteroatom_heterocycles": "Multi-heteroatom heterocycles",
-    "nitrogen_functionalities": "Nitrogen functionalities",
-    "nitrogen_heterocycles": "Nitrogen heterocycles",
-    "oxygen_functionalities": "Oxygen functionalities",
-    "oxygen_heterocycles": "Oxygen heterocycles",
-    "sulfur_functionalities": "Sulfur functionalities",
-    "sulfur_heterocycles": "Sulfur heterocycles",
-}
+
+def tag_label(tag: str) -> str:
+    return tag.replace("_", " ").title()
 
 
 # ---------------------------------------------------------------------------
@@ -86,20 +71,25 @@ def show_quiz_result(score: int, total: int, on_back) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Functional group helpers
+# Tag helpers — shared by both FUNCTIONAL_GROUPS and CHEMICAL_BUILDING_BLOCKS,
+# since both are FunctionalGroup instances classified purely by `tags` now.
 # ---------------------------------------------------------------------------
-def fg_all_categories() -> list[str]:
-    return sorted({fg.category for fg in FUNCTIONAL_GROUPS if fg.category})
+def all_tags(pool: list) -> list[str]:
+    return sorted({tag for item in pool for tag in item.tags})
 
 
-def fg_counts_by_category() -> dict[str, int]:
-    return Counter(fg.category for fg in FUNCTIONAL_GROUPS if fg.category)
+def counts_by_tag(pool: list) -> dict[str, int]:
+    counts: Counter = Counter()
+    for item in pool:
+        for tag in item.tags:
+            counts[tag] += 1
+    return counts
 
 
-def build_filtered_fgs(prefix: str) -> list:
+def build_filtered_by_tags(pool: list, prefix: str) -> list:
     return [
-        fg for fg in FUNCTIONAL_GROUPS
-        if fg.category and st.session_state.get(f"{prefix}cat_{fg.category}", True)
+        item for item in pool
+        if item.tags and any(st.session_state.get(f"{prefix}tag_{tag}", True) for tag in item.tags)
     ]
 
 

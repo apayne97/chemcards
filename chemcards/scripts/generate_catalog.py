@@ -59,8 +59,8 @@ def _catalog_draw_options():
 
 
 def _format_functional_group_legend(item: dict) -> str:
-    """Build a legend for functional-group example entries (name + smarts only; category is a page header)."""
-    return f"{item['example_name']}\n{item['name']}\n{item['smarts']}"
+    """Build a legend for functional-group example entries (name only; group is a page header)."""
+    return f"{item['example_name']}\n{item['name']}"
 
 
 def _make_header_image(label: str, width: int) -> "Image.Image":
@@ -97,17 +97,17 @@ def _render_grouped_pages(
     highlight: bool = False,
     section_label: str | None = None,
 ) -> list["Image.Image"]:
-    """Render a list of molecule items as PIL pages, with a category header per group.
+    """Render a list of molecule items as PIL pages, with a header per group.
 
     Args:
-        items: list of dicts with at least 'mol', 'category', and legend fields.
+        items: list of dicts with at least 'mol', 'group_label', and legend fields.
         mols_per_row: columns per row in the molecular grid.
         img_size: (width, height) per cell in the grid.
         legend_fn: callable(item) -> legend string.
         highlight: whether items carry highlight_atoms / highlight_bonds.
-        section_label: if provided, overrides the per-item category (e.g. for FDA drugs).
+        section_label: if provided, overrides the per-item group label (e.g. for FDA drugs).
     Returns:
-        List of PIL Images, one per category group.
+        List of PIL Images, one per group.
     """
     pages = []
     grid_width = mols_per_row * img_size[0]
@@ -116,11 +116,11 @@ def _render_grouped_pages(
         groups = [(section_label, items)]
     else:
         groups = [
-            (cat, list(grp))
-            for cat, grp in groupby(items, key=lambda x: x["category"])
+            (label, list(grp))
+            for label, grp in groupby(items, key=lambda x: x["group_label"])
         ]
 
-    for category, group_items in groups:
+    for group_label, group_items in groups:
         mols    = [item["mol"] for item in group_items]
         legends = [legend_fn(item) for item in group_items]
         h_atoms = [item.get("highlight_atoms", tuple()) for item in group_items] if highlight else None
@@ -141,7 +141,7 @@ def _render_grouped_pages(
 
         # Resize header to match the grid's actual rendered width
         actual_width = grid_img.width
-        header_img = _make_header_image(category.replace("_", " ").upper(), actual_width)
+        header_img = _make_header_image(group_label.replace("_", " ").upper(), actual_width)
 
         page = Image.new("RGB", (actual_width, header_img.height + grid_img.height), (255, 255, 255))
         page.paste(header_img, (0, 0))
@@ -164,43 +164,135 @@ def _save_pages_as_pdf(pages: list["Image.Image"], out_pdf: Path) -> None:
     )
 
 
-def _load_category_order(categories_yaml_path: Path) -> list[str]:
-    """Load the preferred category display order from YAML.
+_HALOGENS = {9, 17, 35, 53}
+_ELEMENT_PRIORITY = ["O", "N", "X", "S"]  # priority for picking the "primary" element of a mixed entry
+_GROUP_LABELS = {
+    0: "hydrocarbon",
+    1: "oxygen-only",
+    2: "nitrogen-only",
+    3: "sulfur-only",
+    4: "halogen-only",
+    4.5: "mixed",
+    5: "heterocycle",
+}
 
-    Categories are stored as human-readable strings (spaces, lowercase).
-    Returns a list in preferred order; unknown categories sort last.
+
+_ELEMENT_Z = {"O": 8, "N": 7, "S": 16}
+
+
+def _entry_mol(item: dict):
+    """Get a concrete (non-query) molecule for an entry.
+
+    Uses display_smiles rather than the SMARTS pattern — an OR-list SMARTS atom
+    like [F,Cl,Br,I] is a query with no single fixed atomic number or bond order,
+    so counting/bond-order logic straight from the SMARTS pattern gives wrong
+    answers (e.g. silently undercounts halogens).
     """
-    import yaml
-    if not categories_yaml_path.exists():
-        return []
-    with categories_yaml_path.open("r", encoding="utf8") as fh:
-        return [str(c) for c in (yaml.safe_load(fh) or [])]
+    mol = None
+    if item.get("display_smiles"):
+        mol = Chem.MolFromSmiles(item["display_smiles"])
+    if mol is None and item.get("smarts"):
+        mol = Chem.MolFromSmarts(item["smarts"])
+    return mol
+
+
+def _entry_atom_counts(mol) -> dict:
+    """Count O/N/S/halogen/total heavy atoms in a concrete molecule."""
+    counts = {"O": 0, "N": 0, "S": 0, "X": 0, "total": 0}
+    if mol:
+        for atom in mol.GetAtoms():
+            z = atom.GetAtomicNum()
+            if z == 8:
+                counts["O"] += 1
+            elif z == 7:
+                counts["N"] += 1
+            elif z == 16:
+                counts["S"] += 1
+            elif z in _HALOGENS:
+                counts["X"] += 1
+            if z > 0:
+                counts["total"] += 1
+    return counts
+
+
+def _max_bond_order(mol, element: str) -> float:
+    """Highest bond order (1.0/2.0/3.0) touching the given element.
+
+    For "C" (the hydrocarbon group), looks at C-C bonds specifically (ignoring
+    C-H) — this is what separates alkane/alkene/alkyne. For a heteroatom, looks
+    at all bonds on atoms of that element — this is what puts alcohol (C-O,
+    single) before a carbonyl like ketone (C=O, double), or amine before imine
+    before nitrile.
+    """
+    if mol is None:
+        return 0.0
+    best = 0.0
+    if element == "C":
+        for bond in mol.GetBonds():
+            a1, a2 = bond.GetBeginAtom(), bond.GetEndAtom()
+            if a1.GetAtomicNum() == 6 and a2.GetAtomicNum() == 6:
+                best = max(best, bond.GetBondTypeAsDouble())
+    else:
+        z = _ELEMENT_Z.get(element)
+        if z is None:
+            return 1.0  # halogens: always single-bonded in these patterns
+        for atom in mol.GetAtoms():
+            if atom.GetAtomicNum() == z:
+                for bond in atom.GetBonds():
+                    best = max(best, bond.GetBondTypeAsDouble())
+    return best
+
+
+def _catalog_sort_key(item: dict) -> tuple:
+    """Order: hydrocarbon, oxygen-only, nitrogen-only, sulfur-only, halogen-only,
+    mixed (2+ different heteroatom types), heterocycle (all ring-tagged entries,
+    one trailing flat group). Within a pure-element bucket: entries with just one
+    atom of that element ("alone") before entries with several ("more of itself"),
+    then ascending bond order at that element (single < double < triple — e.g.
+    alcohol before ketone, amine before imine before nitrile), then ascending
+    atom count. Within "mixed": by which element is present with the highest
+    priority (O > N > halogen > S), then bond order, then atom count. Carbonyl
+    oxygens count the same as any other oxygen for bucketing — there's no
+    separate "carbonyl" bucket.
+    """
+    name = (item.get("name") or "unknown").casefold()
+    is_cyclic = "heterocycle" in (item.get("tags") or [])
+    mol = _entry_mol(item)
+    c = _entry_atom_counts(mol)
+    present = [e for e in ("O", "N", "S", "X") if c[e] > 0]
+
+    if is_cyclic:
+        group = 5
+        rank = (c["total"], name)
+    elif not present:
+        group = 0
+        rank = (_max_bond_order(mol, "C"), c["total"], name)
+    elif len(present) == 1:
+        elem = present[0]
+        group = {"O": 1, "N": 2, "S": 3, "X": 4}[elem]
+        tier = 0 if c[elem] <= 1 else 1  # alone vs. more of itself
+        rank = (tier, _max_bond_order(mol, elem), c["total"], name)
+    else:
+        group = 4.5
+        primary = next(e for e in _ELEMENT_PRIORITY if c[e] > 0)
+        rank = (_ELEMENT_PRIORITY.index(primary), _max_bond_order(mol, primary), c["total"], name)
+
+    return (group, rank)
 
 
 def _load_functional_groups(yaml_path: Path):
-    """Load functional group definitions from YAML file."""
+    """Load functional group definitions from YAML file, grouped/sorted by element composition."""
     import yaml
     if not yaml_path.exists():
         return []
     with yaml_path.open("r", encoding="utf8") as fh:
         data = yaml.safe_load(fh) or []
 
-    # Load preferred category order (normalise both sides to space-separated lowercase).
-    categories_path = yaml_path.parent / "functional_group_categories.yaml"
-    category_order = _load_category_order(categories_path)
-    # Map normalised category string -> sort index; unknowns go last.
-    category_rank = {c.lower(): i for i, c in enumerate(category_order)}
-
-    def _sort_key(item):
-        raw = (item.get("category") or "uncategorized").replace("_", " ").lower()
-        return (category_rank.get(raw, len(category_order)), (item.get("name") or "unknown").casefold())
-
-    data = sorted(data, key=_sort_key)
+    data = sorted(data, key=_catalog_sort_key)
 
     groups = []
     for item in data:
         name = item.get("name") or "unknown"
-        category = item.get("category") or "uncategorized"
         smarts = item.get("smarts")
         if smarts:
             patt = Chem.MolFromSmarts(smarts) if Chem else None
@@ -208,7 +300,7 @@ def _load_functional_groups(yaml_path: Path):
                 groups.append(
                     {
                         "name": name,
-                        "category": category,
+                        "group_label": _GROUP_LABELS[_catalog_sort_key(item)[0]],
                         "smarts": smarts,
                         "pattern": patt,
                     }
@@ -220,7 +312,7 @@ def _load_functional_group_examples(yaml_path: Path):
     """Load one highlighted molecule example per functional group.
 
     Each entry contains:
-    - name/category
+    - name/group_label
     - mol: a molecule from MoleculeDB containing the SMARTS pattern
     - highlight: atom indices for the matched SMARTS substructure
     """
@@ -262,7 +354,7 @@ def _load_functional_group_examples(yaml_path: Path):
 
                     match_entry = {
                         "name": fg["name"],
-                        "category": fg["category"],
+                        "group_label": fg["group_label"],
                         "smarts": fg["smarts"],
                         "mol": rmol,
                         "highlight_atoms": highlight_atoms,
