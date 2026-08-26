@@ -10,7 +10,7 @@ ChemCards is an interactive study tool designed for chemistry students and profe
 - **FDA-Approved Drugs** - Study molecular structures, targets, and mechanisms of action
 - **Interactive Quizzes** - Multiple-choice questions with visual molecule rendering
 
-The application uses RDKit for molecule visualization and provides a GUI-based quiz system powered by tkinter/ttkbootstrap.
+The application uses RDKit for molecule visualization and is built as a Streamlit web app.
 
 ## Installation
 
@@ -55,13 +55,13 @@ This will:
 
 ### 2. Start the Quiz Application
 
-Launch the interactive GUI:
+Launch the Streamlit app:
 
 ```bash
-chemcards start
+streamlit run app.py
 ```
 
-This opens the main window where you can select from various quiz modes.
+This opens a browser tab where you can select from various quiz modes.
 
 ### 3. Generate a Molecule Catalog
 Note: You don't need to download the database to generate a catalog of functional groups, but you do need it for the FDA-approved drugs section.
