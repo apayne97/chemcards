@@ -165,15 +165,19 @@ def _save_pages_as_pdf(pages: list["Image.Image"], out_pdf: Path) -> None:
 
 
 _HALOGENS = {9, 17, 35, 53}
-_ELEMENT_PRIORITY = ["O", "N", "X", "S"]  # priority for picking the "primary" element of a mixed entry
+_FULL_PRIORITY = ["O", "N", "X", "S"]
+_SECONDARY_PRIORITY = ["N", "X", "S"]  # priority once O is set aside as "given"
 _GROUP_LABELS = {
     0: "hydrocarbon",
     1: "oxygen-only",
     2: "nitrogen-only",
     3: "sulfur-only",
     4: "halogen-only",
-    4.5: "mixed",
-    5: "heterocycle",
+    4.5: "acyclic multi-heteroatom",
+    5: "oxygen heterocycle",
+    6: "nitrogen heterocycle",
+    7: "sulfur heterocycle",
+    7.5: "multi-heteroatom heterocycle",
 }
 
 
@@ -243,17 +247,42 @@ def _max_bond_order(mol, element: str) -> float:
     return best
 
 
+def _mixed_defining_element(present: list) -> str:
+    """Pick the element that differentiates a multi-heteroatom entry.
+
+    Oxygen almost always tags along via a carbonyl or sulfonyl group and isn't
+    a useful differentiator once another heteroatom is present, so it's set
+    aside in favor of N > halogen > S whenever something else is present too
+    (e.g. amide/urea/acyl hydrazine — all O+N — sort ahead of sulfone — O+S —
+    which sorts ahead of sulfonamide — O+N+S, the most different elements).
+    """
+    candidates = [e for e in present if e != "O"] or present
+    order = _SECONDARY_PRIORITY if "O" in present else _FULL_PRIORITY
+    return next(e for e in order if e in candidates)
+
+
+def _multi_heteroatom_rank(counts: dict, present: list, name: str) -> tuple:
+    """Sort key shared by the acyclic and cyclic multi-heteroatom groups: fewer
+    distinct heteroatom types first, then by the priority of the defining
+    element (see _mixed_defining_element), then "alone" vs. "more of itself"
+    for that element's atom count, then ascending total atom count, then name.
+    """
+    defining = _mixed_defining_element(present)
+    tier = 0 if counts[defining] <= 1 else 1
+    return (len(present), _FULL_PRIORITY.index(defining), tier, counts["total"], name)
+
+
 def _catalog_sort_key(item: dict) -> tuple:
-    """Order: hydrocarbon, oxygen-only, nitrogen-only, sulfur-only, halogen-only,
-    mixed (2+ different heteroatom types), heterocycle (all ring-tagged entries,
-    one trailing flat group). Within a pure-element bucket: entries with just one
-    atom of that element ("alone") before entries with several ("more of itself"),
-    then ascending bond order at that element (single < double < triple — e.g.
-    alcohol before ketone, amine before imine before nitrile), then ascending
-    atom count. Within "mixed": by which element is present with the highest
-    priority (O > N > halogen > S), then bond order, then atom count. Carbonyl
-    oxygens count the same as any other oxygen for bucketing — there's no
-    separate "carbonyl" bucket.
+    """Acyclic entries first, then heterocycles (ring-tagged entries), each
+    ordered hydrocarbon/none -> oxygen-only -> nitrogen-only -> sulfur-only
+    -> [acyclic: halogen-only] -> multi-heteroatom (2+ heteroatom types).
+    Within a pure-element bucket: "alone" (one atom of that element) before
+    "more of itself" (several), then ascending bond order at that element for
+    acyclic entries (single < double < triple — alcohol before ketone; amine
+    before imine before nitrile), then ascending atom count. Within a
+    multi-heteroatom bucket, see _multi_heteroatom_rank. Carbonyl oxygens
+    count the same as any other oxygen for bucketing — no separate "carbonyl"
+    bucket.
     """
     name = (item.get("name") or "unknown").casefold()
     is_cyclic = "heterocycle" in (item.get("tags") or [])
@@ -261,21 +290,22 @@ def _catalog_sort_key(item: dict) -> tuple:
     c = _entry_atom_counts(mol)
     present = [e for e in ("O", "N", "S", "X") if c[e] > 0]
 
-    if is_cyclic:
-        group = 5
-        rank = (c["total"], name)
-    elif not present:
-        group = 0
-        rank = (_max_bond_order(mol, "C"), c["total"], name)
-    elif len(present) == 1:
+    if not is_cyclic and not present:
+        group, rank = 0, (_max_bond_order(mol, "C"), c["total"], name)
+    elif not is_cyclic and len(present) == 1:
         elem = present[0]
         group = {"O": 1, "N": 2, "S": 3, "X": 4}[elem]
         tier = 0 if c[elem] <= 1 else 1  # alone vs. more of itself
         rank = (tier, _max_bond_order(mol, elem), c["total"], name)
+    elif not is_cyclic:
+        group, rank = 4.5, _multi_heteroatom_rank(c, present, name)
+    elif len(present) == 1:
+        elem = present[0]
+        group = {"O": 5, "N": 6, "S": 7}[elem]
+        tier = 0 if c[elem] <= 1 else 1
+        rank = (tier, c["total"], name)
     else:
-        group = 4.5
-        primary = next(e for e in _ELEMENT_PRIORITY if c[e] > 0)
-        rank = (_ELEMENT_PRIORITY.index(primary), _max_bond_order(mol, primary), c["total"], name)
+        group, rank = 7.5, _multi_heteroatom_rank(c, present, name)
 
     return (group, rank)
 

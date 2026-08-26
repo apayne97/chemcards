@@ -109,8 +109,8 @@
   smarts: "[C,c](=O)[CX4,CR0X3,O][C,c](=O)"
   display_smiles: "[*:1]C(=O)CC(=O)[*:2]"
 - name: beta-lactam
-  kind: functional_group
-  tags: [nitrogen, carbonyl]
+  kind: chemical_building_block
+  tags: [heterocycle, nitrogen, carbonyl]
   smarts: "[NX3]1[CX4][CX4][CX3]1(=[OX1])"
   display_smiles: "O=C1CCN1"
 - name: morpholine
