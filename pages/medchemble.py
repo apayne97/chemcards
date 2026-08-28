@@ -126,37 +126,37 @@ def new_game():
 
 
 # ---------------------------------------------------------------------------
-# Sidebar
+# Answer-mode selector — main content area only (idle screen + end-of-round screens),
+# never while a round is "playing". A player could otherwise see the structure in "Write
+# the name" mode, switch to "Draw the Structure", and just copy what they already saw —
+# keeping this out of the sidebar (rendered every rerun regardless of game state) and only
+# calling it from non-playing branches makes that structurally impossible, not just disabled.
 # ---------------------------------------------------------------------------
 def _reset_round_on_mode_change():
-    """Switching mode mid-round would let a player see the structure in "Write the name"
-    mode, then flip to "Draw the Structure" and just copy what they already saw — force a
-    fresh round instead."""
     st.session_state[_k("target")] = None
     st.session_state[_k("guesses")] = []
     st.session_state[_k("game_status")] = "idle"
     st.session_state[_k("is_daily")] = False
 
 
+def show_answer_mode_selector():
+    st.radio(
+        "How do you want to answer?",
+        ["Write the name", "Draw the Structure"],
+        key=_k("answer_mode"),
+        on_change=_reset_round_on_mode_change,
+        horizontal=True,
+        help='"Draw the Structure" shows the name and asks you to draw a matching structure.',
+    )
+
+
+# ---------------------------------------------------------------------------
+# Sidebar
+# ---------------------------------------------------------------------------
 def show_sidebar():
     tags = all_tags(CHEMICAL_BUILDING_BLOCKS)
     counts = counts_by_tag(CHEMICAL_BUILDING_BLOCKS)
     with st.sidebar:
-        is_playing = st.session_state[_k("game_status")] == "playing"
-        help_text = '"Draw the Structure" shows the name and asks you to draw a matching structure.'
-        if is_playing:
-            help_text = (
-                "Locked until you finish or give up the current round — otherwise you could "
-                "see the structure in one mode and just copy it in the other.\n\n" + help_text
-            )
-        st.radio(
-            "How do you want to answer?",
-            ["Write the name", "Draw the Structure"],
-            key=_k("answer_mode"),
-            on_change=_reset_round_on_mode_change,
-            disabled=is_playing,
-            help=help_text,
-        )
         st.button("📅 Today's Building Block", type="primary", use_container_width=True, on_click=daily_game)
         st.button("🎲 Random Building Block", use_container_width=True, on_click=new_game)
         st.divider()
@@ -222,12 +222,13 @@ def render_drawn_guess_row(guess_dict: dict, n: int):
 def show_idle():
     st.title("🧱 MedChemble")
     st.markdown(
-        "A Wordle-style chemical building block identification game. Choose a mode in the "
-        "sidebar: **Write the name** shows a mystery structure for you to name, or "
-        "**Draw the Structure** gives you the name and asks you to draw a matching structure. "
-        "Each guess shows eight structural properties as green (match) or grey (no match) "
-        "tiles: " + ", ".join(f"**{tag_label(t)}**" for t in TILE_TAGS) + "."
+        "A Wordle-style chemical building block identification game. **Write the name** "
+        "shows a mystery structure for you to name, or **Draw the Structure** gives you the "
+        "name and asks you to draw a matching structure. Each guess shows eight structural "
+        "properties as green (match) or grey (no match) tiles: " +
+        ", ".join(f"**{tag_label(t)}**" for t in TILE_TAGS) + "."
     )
+    show_answer_mode_selector()
     st.divider()
     col1, col2 = st.columns(2)
     with col1:
@@ -295,11 +296,13 @@ def show_name_game():
         elif status == "won":
             st.success(f"🎉 Correct! The chemical building block was **{target.name}**.")
             _show_answer_details(target)
+            show_answer_mode_selector()
             st.button("🎲 New Random Building Block", type="primary", use_container_width=True, on_click=new_game)
 
         elif status == "lost":
             st.error(f"The chemical building block was **{target.name}**.")
             _show_answer_details(target)
+            show_answer_mode_selector()
             st.button("🎲 New Random Building Block", type="primary", use_container_width=True, on_click=new_game)
 
 
@@ -351,11 +354,13 @@ def show_draw_game():
     elif status == "won":
         st.success(f"🎉 Exact match! That was **{target.name}**.")
         _show_draw_answer(target, target_mol)
+        show_answer_mode_selector()
         st.button("🎲 New Random Building Block", type="primary", use_container_width=True, on_click=new_game)
 
     elif status == "lost":
         st.error(f"The target structure was **{target.name}**.")
         _show_draw_answer(target, target_mol)
+        show_answer_mode_selector()
         st.button("🎲 New Random Building Block", type="primary", use_container_width=True, on_click=new_game)
 
 
