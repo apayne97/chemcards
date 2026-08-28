@@ -128,15 +128,34 @@ def new_game():
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
+def _reset_round_on_mode_change():
+    """Switching mode mid-round would let a player see the structure in "Write the name"
+    mode, then flip to "Draw the Structure" and just copy what they already saw — force a
+    fresh round instead."""
+    st.session_state[_k("target")] = None
+    st.session_state[_k("guesses")] = []
+    st.session_state[_k("game_status")] = "idle"
+    st.session_state[_k("is_daily")] = False
+
+
 def show_sidebar():
     tags = all_tags(CHEMICAL_BUILDING_BLOCKS)
     counts = counts_by_tag(CHEMICAL_BUILDING_BLOCKS)
     with st.sidebar:
+        is_playing = st.session_state[_k("game_status")] == "playing"
+        help_text = '"Draw the Structure" shows the name and asks you to draw a matching structure.'
+        if is_playing:
+            help_text = (
+                "Locked until you finish or give up the current round — otherwise you could "
+                "see the structure in one mode and just copy it in the other.\n\n" + help_text
+            )
         st.radio(
             "How do you want to answer?",
             ["Write the name", "Draw the Structure"],
             key=_k("answer_mode"),
-            help='"Draw the Structure" shows the name and asks you to draw a matching structure.',
+            on_change=_reset_round_on_mode_change,
+            disabled=is_playing,
+            help=help_text,
         )
         st.button("📅 Today's Building Block", type="primary", use_container_width=True, on_click=daily_game)
         st.button("🎲 Random Building Block", use_container_width=True, on_click=new_game)
