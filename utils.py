@@ -2,7 +2,7 @@ import json
 import streamlit as st
 from collections import Counter
 from rdkit import Chem
-from rdkit.Chem import MolFromSmiles, MolFromSmarts, AllChem
+from rdkit.Chem import MolFromSmiles, MolFromSmarts, AllChem, rdFMCS
 from rdkit.Chem import rdRGroupDecomposition
 from rdkit.Chem.Draw import rdMolDraw2D
 
@@ -161,17 +161,39 @@ def build_filtered_drug_db(prefix: str) -> MoleculeDB:
 # ---------------------------------------------------------------------------
 # Rendering
 # ---------------------------------------------------------------------------
-def _draw_mol(mol, size: int) -> bytes | None:
+def _draw_mol(mol, size: int, highlight_atoms=None, highlight_bonds=None) -> bytes | None:
     if mol is None:
         return None
     d = rdMolDraw2D.MolDraw2DCairo(size, size)
-    rdMolDraw2D.PrepareAndDrawMolecule(d, mol)
+    rdMolDraw2D.PrepareAndDrawMolecule(
+        d, mol, highlightAtoms=highlight_atoms or [], highlightBonds=highlight_bonds or [],
+    )
     d.FinishDrawing()
     return d.GetDrawingText()
 
 
 def render_smiles(smiles: str, size: int = 300) -> bytes | None:
     return _draw_mol(MolFromSmiles(smiles), size)
+
+
+def render_mol(mol, size: int = 300, highlight_atoms=None, highlight_bonds=None) -> bytes | None:
+    """Render an already-constructed RDKit mol (e.g. a user-drawn structure), optionally
+    with a substructure highlighted — see mcs_highlight_atoms()."""
+    return _draw_mol(mol, size, highlight_atoms, highlight_bonds)
+
+
+def mcs_highlight_atoms(mol_a: Chem.Mol, mol_b: Chem.Mol) -> tuple[list[int], list[int]]:
+    """Atom indices in mol_a/mol_b that fall within their maximum common substructure —
+    for showing a player how close their drawn guess is to the target structure."""
+    if mol_a is None or mol_b is None:
+        return [], []
+    mcs = rdFMCS.FindMCS([mol_a, mol_b], timeout=5)
+    if not mcs.smartsString:
+        return [], []
+    patt = MolFromSmarts(mcs.smartsString)
+    if patt is None:
+        return [], []
+    return list(mol_a.GetSubstructMatch(patt)), list(mol_b.GetSubstructMatch(patt))
 
 
 def render_smarts(smarts: str, size: int = 300) -> bytes | None:

@@ -2,7 +2,7 @@
 
 The player is shown a mystery functional group (as a SMARTS pattern) and must
 name it.  Each guess is matched to the closest functional group in the
-database; seven structural properties (one per canonical tag) are shown as
+database; eight structural properties (one per canonical tag) are shown as
 green / grey tiles.
 """
 import datetime
@@ -25,7 +25,7 @@ P = "orgle_"
 # Chem.MolFromSmarts on a recursive SMARTS pattern like "[$(n1ncnc1),$(n1nncc1)]" (triazole,
 # oxazole, thiazole, dioxane) produces a single query atom with no materialized ring bonds, so
 # ring-perception calls like GetSSSR wrongly report 0 rings for those entries.
-TILE_TAGS = ["heterocycle", "hydrocarbon", "oxygen", "nitrogen", "halogen", "sulfur", "carbonyl"]
+TILE_TAGS = ["heterocycle", "hydrocarbon", "oxygen", "nitrogen", "halogen", "sulfur", "carbonyl", "aromatic"]
 
 
 def _k(key):
@@ -149,7 +149,7 @@ def show_idle():
     st.title("⚗️ Orgle")
     st.markdown(
         "A Wordle-style organic chemistry game. A mystery SMARTS pattern is shown — "
-        "guess the functional group name. Each guess shows seven structural properties as "
+        "guess the functional group name. Each guess shows eight structural properties as "
         "green (match) or grey (no match) tiles: " +
         ", ".join(f"**{tag_label(t)}**" for t in TILE_TAGS) + "."
     )

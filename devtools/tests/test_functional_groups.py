@@ -89,3 +89,19 @@ class TestFunctionalGroupVsChemicalBuildingBlockSplit:
 
         untagged = [cbb.name for cbb in CHEMICAL_BUILDING_BLOCKS if not cbb.tags]
         assert untagged == [], f"Chemical building blocks missing tags: {untagged}"
+
+    def test_compute_tags_matches_curated_tags(self):
+        """compute_tags() derives tags from an arbitrary molecule for the "Draw the
+        Structure" quiz mode — it must agree with every hand-curated entry's own tags,
+        since the game compares a player's drawn structure against a curated target."""
+        from rdkit import Chem
+        from chemcards.database.cheminformatics import (
+            FUNCTIONAL_GROUPS, CHEMICAL_BUILDING_BLOCKS, compute_tags,
+        )
+
+        mismatches = []
+        for fg in FUNCTIONAL_GROUPS + CHEMICAL_BUILDING_BLOCKS:
+            mol = Chem.MolFromSmiles(fg.display_smiles) if fg.display_smiles else Chem.MolFromSmarts(fg.smarts)
+            if compute_tags(mol) != set(fg.tags):
+                mismatches.append(fg.name)
+        assert mismatches == [], f"compute_tags() disagrees with curated tags for: {mismatches}"
