@@ -1,4 +1,5 @@
-from chemcards.database.core import MoleculeDB, MoleculeEntry
+from chemcards.database.core import MoleculeDB, MoleculeEntry, DatabaseShrinkError
+import chemcards.database.core as core
 import pytest
 
 
@@ -19,38 +20,59 @@ class TestMoleculeDB:
         moleculedb.load()
         assert len(moleculedb.molecules) >= 4
 
-    def test_update_backfills_all_targets_for_preserved_legacy_entries(self):
-        """A molecule only present in `other` (e.g. a legacy entry predating the
-        all_targets/mechanism-join pipeline) can have a real `target` but an empty
-        `all_targets`. update() should backfill all_targets=[target] for it."""
-        legacy = MoleculeEntry(name="LEGACY", smiles="C", target="Some Receptor", all_targets=[])
-        other = MoleculeDB(molecules=[legacy])
-        fresh = MoleculeDB(molecules=[])
+    @pytest.fixture
+    def temp_db_path(self, tmp_path, monkeypatch):
+        """Redirect MOLECULE_DATABASE to a scratch file so save() tests never touch the
+        real database."""
+        path = tmp_path / "molecule_database.json"
+        monkeypatch.setattr(core, "MOLECULE_DATABASE", path)
+        return path
 
-        merged = fresh.update(other)
+    def _write(self, path, names):
+        path.write_text(
+            MoleculeDB(
+                molecules=[MoleculeEntry(name=n, smiles="C") for n in names]
+            ).model_dump_json()
+        )
 
-        result = next(m for m in merged.molecules if m.name == "LEGACY")
-        assert result.all_targets == ["Some Receptor"]
+    def test_save_fully_replaces_existing_content(self, temp_db_path):
+        """A molecule present in the old file but absent from the new build is dropped —
+        save() no longer preserves "legacy" entries the current build doesn't reproduce.
+        Same molecule count on both sides so this doesn't also trigger the shrink guard."""
+        self._write(temp_db_path, [f"OLD{i}" for i in range(10)])
 
-    def test_update_does_not_touch_unknown_target(self):
-        """A molecule with no known target at all should stay untouched — nothing to backfill."""
-        legacy = MoleculeEntry(name="LEGACY", smiles="C", target="unknown", all_targets=[])
-        other = MoleculeDB(molecules=[legacy])
-        fresh = MoleculeDB(molecules=[])
+        fresh = MoleculeDB(molecules=[MoleculeEntry(name=f"NEW{i}", smiles="C") for i in range(10)])
+        fresh.save()
 
-        merged = fresh.update(other)
+        reloaded = MoleculeDB.load()
+        assert [m.name for m in reloaded.molecules] == [f"NEW{i}" for i in range(10)]
 
-        result = next(m for m in merged.molecules if m.name == "LEGACY")
-        assert result.all_targets == []
+    def test_save_refuses_large_shrink(self, temp_db_path):
+        """A drop bigger than SHRINK_GUARD_FRACTION looks like a broken/partial build, not a
+        real pruning — save() should refuse rather than silently wiping the database."""
+        self._write(temp_db_path, [f"MOL{i}" for i in range(10)])
 
-    def test_update_does_not_touch_fresh_entries(self):
-        """A fresh-build entry that already has all_targets set should be left alone —
-        fresh entries always win on conflict regardless."""
-        fresh_entry = MoleculeEntry(name="FRESH", smiles="C", target="A", all_targets=["A", "B"])
-        fresh = MoleculeDB(molecules=[fresh_entry])
-        other = MoleculeDB(molecules=[])
+        fresh = MoleculeDB(molecules=[MoleculeEntry(name="MOL0", smiles="C")])  # 90% smaller
+        with pytest.raises(DatabaseShrinkError):
+            fresh.save()
 
-        merged = fresh.update(other)
+        # refused — the file on disk is untouched
+        assert len(MoleculeDB.load().molecules) == 10
 
-        result = next(m for m in merged.molecules if m.name == "FRESH")
-        assert result.all_targets == ["A", "B"]
+    def test_save_force_overrides_shrink_guard(self, temp_db_path):
+        self._write(temp_db_path, [f"MOL{i}" for i in range(10)])
+
+        fresh = MoleculeDB(molecules=[MoleculeEntry(name="MOL0", smiles="C")])
+        fresh.save(force=True)
+
+        assert [m.name for m in MoleculeDB.load().molecules] == ["MOL0"]
+
+    def test_save_allows_small_shrink(self, temp_db_path):
+        """Dropping a couple of molecules out of many (e.g. a few no longer qualifying as
+        Small molecule) is within SHRINK_GUARD_FRACTION and should save without force."""
+        self._write(temp_db_path, [f"MOL{i}" for i in range(10)])
+
+        fresh = MoleculeDB(molecules=[MoleculeEntry(name=f"MOL{i}", smiles="C") for i in range(9)])
+        fresh.save()  # 10% smaller — right at the guard boundary, not over it
+
+        assert len(MoleculeDB.load().molecules) == 9
