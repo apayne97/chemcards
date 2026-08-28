@@ -161,6 +161,13 @@ def new_game():
 # the name" mode, switch to "Draw the Structure", and just copy what they already saw —
 # keeping this out of the sidebar (rendered every rerun regardless of game state) and only
 # calling it from non-playing branches makes that structurally impossible, not just disabled.
+#
+# Deliberately two buttons, not st.radio: an st.radio rendered on this screen, once clicked,
+# corrupts the Ketcher component's later Apply-triggered rerun in "Draw the Structure" mode —
+# a full Streamlit-frontend reload that wipes session_state, reproducible independent of the
+# streamlit-ketcher/Ketcher version. Root cause looks like a Streamlit-level widget-ID/component
+# remount bug, not anything in this app's own code — swapping the radio for two buttons avoids
+# it entirely while keeping the same "which mode is selected" affordance.
 # ---------------------------------------------------------------------------
 def _reset_round_on_mode_change():
     st.session_state[_k("target")] = None
@@ -169,13 +176,25 @@ def _reset_round_on_mode_change():
     st.session_state[_k("is_daily")] = False
 
 
+def _set_answer_mode(mode: str):
+    if st.session_state[_k("answer_mode")] != mode:
+        st.session_state[_k("answer_mode")] = mode
+        _reset_round_on_mode_change()
+
+
 def show_answer_mode_selector():
-    st.radio(
-        "How do you want to answer?",
-        ["Write the name", "Draw the Structure"],
-        key=_k("answer_mode"),
-        on_change=_reset_round_on_mode_change,
-        horizontal=True,
+    st.caption("How do you want to answer?")
+    current = st.session_state.get(_k("answer_mode"), "Write the name")
+    col1, col2 = st.columns(2)
+    col1.button(
+        "Write the name", use_container_width=True,
+        type="primary" if current == "Write the name" else "secondary",
+        on_click=_set_answer_mode, args=("Write the name",),
+    )
+    col2.button(
+        "Draw the Structure", use_container_width=True,
+        type="primary" if current == "Draw the Structure" else "secondary",
+        on_click=_set_answer_mode, args=("Draw the Structure",),
         help='"Draw the Structure" shows the name and asks you to draw a matching structure.',
     )
 
