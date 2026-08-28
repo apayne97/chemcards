@@ -2,12 +2,13 @@ import json
 import streamlit as st
 from collections import Counter
 from rdkit import Chem
-from rdkit.Chem import MolFromSmiles, MolFromSmarts, AllChem
+from rdkit.Chem import MolFromSmiles, MolFromSmarts, AllChem, rdFMCS
 from rdkit.Chem import rdRGroupDecomposition
 from rdkit.Chem.Draw import rdMolDraw2D
 
 from chemcards.database.core import MoleculeDB
 from chemcards.database.resources import CHEMBL_ATC_DOWNLOAD
+from chemcards.database.cheminformatics import KIND_LABELS
 
 # ---------------------------------------------------------------------------
 # ATC constants
@@ -44,8 +45,10 @@ def norm_name(s: str) -> str:
     return "".join(s.lower().split()).replace("-", "").replace(",", "")
 
 
-def tile_html(label: str, match: bool, level: str) -> str:
-    bg = "#538d4e" if match else "#3a3a3c"
+_TILE_STATE_COLORS = {"green": "#538d4e", "yellow": "#b59f3b", "grey": "#3a3a3c"}
+
+
+def _tile_div(bg: str, label: str, level: str) -> str:
     return (
         f"<div style='background:{bg};color:white;border-radius:6px;padding:8px 6px;"
         f"text-align:center;margin:2px;min-height:60px;display:flex;"
@@ -54,6 +57,18 @@ def tile_html(label: str, match: bool, level: str) -> str:
         f"<div style='font-size:0.8em;font-weight:600;line-height:1.2;'>{label}</div>"
         f"</div>"
     )
+
+
+def tile_html(label: str, match: bool, level: str) -> str:
+    return _tile_div(_TILE_STATE_COLORS["green" if match else "grey"], label, level)
+
+
+def tile_html_tristate(label: str, state: str, level: str) -> str:
+    """Like tile_html, but with a third "yellow" state — for Wordle-style tiles that mean
+    "the right thing is present, just the wrong amount" (e.g. an element count that's
+    nonzero on both sides but doesn't match exactly), distinct from a plain match/no-match.
+    """
+    return _tile_div(_TILE_STATE_COLORS.get(state, _TILE_STATE_COLORS["grey"]), label, level)
 
 
 def show_quiz_result(score: int, total: int, on_back) -> None:
@@ -86,10 +101,27 @@ def counts_by_tag(pool: list) -> dict[str, int]:
     return counts
 
 
-def build_filtered_by_tags(pool: list, prefix: str) -> list:
+# ---------------------------------------------------------------------------
+# Kind facet — functional_group vs chemical_building_block. The player-facing pages present
+# both together as one "Chemical Building Block" pool, but keep `kind` as an internal filter
+# facet alongside tags (see build_filtered_pool()).
+# ---------------------------------------------------------------------------
+def init_kind_filter_state(prefix: str):
+    for kind in KIND_LABELS:
+        st.session_state.setdefault(f"{prefix}kind_{kind}", True)
+
+
+def show_kind_filter(prefix: str):
+    cols = st.columns(len(KIND_LABELS))
+    for col, (kind, label) in zip(cols, KIND_LABELS.items()):
+        col.checkbox(label, key=f"{prefix}kind_{kind}")
+
+
+def build_filtered_pool(pool: list, prefix: str) -> list:
     return [
         item for item in pool
-        if item.tags and any(st.session_state.get(f"{prefix}tag_{tag}", True) for tag in item.tags)
+        if st.session_state.get(f"{prefix}kind_{item.kind}", True)
+        and item.tags and any(st.session_state.get(f"{prefix}tag_{tag}", True) for tag in item.tags)
     ]
 
 
@@ -161,17 +193,39 @@ def build_filtered_drug_db(prefix: str) -> MoleculeDB:
 # ---------------------------------------------------------------------------
 # Rendering
 # ---------------------------------------------------------------------------
-def _draw_mol(mol, size: int) -> bytes | None:
+def _draw_mol(mol, size: int, highlight_atoms=None, highlight_bonds=None) -> bytes | None:
     if mol is None:
         return None
     d = rdMolDraw2D.MolDraw2DCairo(size, size)
-    rdMolDraw2D.PrepareAndDrawMolecule(d, mol)
+    rdMolDraw2D.PrepareAndDrawMolecule(
+        d, mol, highlightAtoms=highlight_atoms or [], highlightBonds=highlight_bonds or [],
+    )
     d.FinishDrawing()
     return d.GetDrawingText()
 
 
 def render_smiles(smiles: str, size: int = 300) -> bytes | None:
     return _draw_mol(MolFromSmiles(smiles), size)
+
+
+def render_mol(mol, size: int = 300, highlight_atoms=None, highlight_bonds=None) -> bytes | None:
+    """Render an already-constructed RDKit mol (e.g. a user-drawn structure), optionally
+    with a substructure highlighted — see mcs_highlight_atoms()."""
+    return _draw_mol(mol, size, highlight_atoms, highlight_bonds)
+
+
+def mcs_highlight_atoms(mol_a: Chem.Mol, mol_b: Chem.Mol) -> tuple[list[int], list[int]]:
+    """Atom indices in mol_a/mol_b that fall within their maximum common substructure —
+    for showing a player how close their drawn guess is to the target structure."""
+    if mol_a is None or mol_b is None:
+        return [], []
+    mcs = rdFMCS.FindMCS([mol_a, mol_b], timeout=5)
+    if not mcs.smartsString:
+        return [], []
+    patt = MolFromSmarts(mcs.smartsString)
+    if patt is None:
+        return [], []
+    return list(mol_a.GetSubstructMatch(patt)), list(mol_b.GetSubstructMatch(patt))
 
 
 def render_smarts(smarts: str, size: int = 300) -> bytes | None:

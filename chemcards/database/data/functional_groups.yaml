@@ -5,87 +5,87 @@
   display_smiles: "[*:1]C(=O)Cl"
 - name: acylimidazole
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen, carbonyl]
+  tags: [ring, nitrogen, carbonyl, aromatic]
   smarts: "[#6][CX3](=[OX1])n1cncc1"
   display_smiles: "[*:1]C(=O)n1ccnc1"
 - name: para-quinone
   kind: functional_group
-  tags: [carbonyl]
+  tags: [ring, carbonyl]
   smarts: "[#6X3]1=,:[#6X3]-,:[#6X3](=[OX1])-,:[#6X3]=,:[#6X3]-,:[#6X3]1(=[OX1])"
   display_smiles: "O=C1C=CC(=O)C=C1"
 - name: ortho-quinone
   kind: functional_group
-  tags: [carbonyl]
+  tags: [ring, carbonyl]
   smarts: "[#6X3]1(=[OX1])-,:[#6X3](=[OX1])-,:[#6X3]=,:[#6X3]-,:[#6X3]=,:[#6X3]1"
   display_smiles: "O=C1C(=O)C=CC=C1"
 - name: thiophene
   kind: chemical_building_block
-  tags: [heterocycle, sulfur]
+  tags: [ring, sulfur, aromatic]
   smarts: "c1ccc[sX2]1"
   display_smiles: "c1cccs1"
 - name: furan
   kind: chemical_building_block
-  tags: [heterocycle, oxygen]
+  tags: [ring, oxygen, aromatic]
   smarts: "o1cccc1"
   display_smiles: "c1ccco1"
 - name: pyrrole
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen]
+  tags: [ring, nitrogen, aromatic]
   smarts: "[nH]1cccc1"
   display_smiles: "c1cc[nH]c1"
 - name: imidazole
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen]
+  tags: [ring, nitrogen, aromatic]
   smarts: "c1c[nH]cn1"
   display_smiles: "c1c[nH]cn1"
 - name: pyrazole
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen]
+  tags: [ring, nitrogen, aromatic]
   smarts: "c1cc[nH]n1"
   display_smiles: "c1cc[nH]n1"
 - name: triazole
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen]
+  tags: [ring, nitrogen, aromatic]
   smarts: "[$(n1ncnc1),$(n1nncc1)]"
   display_smiles: "c1nc[nH]n1"
 - name: pyrimidine
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen]
+  tags: [ring, nitrogen, aromatic]
   smarts: "n1cnccc1"
   display_smiles: "c1ccncn1"
 - name: pyridazine
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen]
+  tags: [ring, nitrogen, aromatic]
   smarts: "n1ncccc1"
   display_smiles: "c1ccnnc1"
 - name: pyrazine
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen]
+  tags: [ring, nitrogen, aromatic]
   smarts: "n1ccncc1"
   display_smiles: "c1cnccn1"
 - name: oxazole
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen, oxygen]
+  tags: [ring, nitrogen, oxygen, aromatic]
   smarts: "[$(o1cncc1),$(o1nccc1)]"
   display_smiles: "c1cnco1"
 - name: thiazole
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen, sulfur]
+  tags: [ring, nitrogen, sulfur, aromatic]
   smarts: "[$(s1cncc1),$(s1nccc1)]"
   display_smiles: "c1cncs1"
 - name: pyridine
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen]
+  tags: [ring, nitrogen, aromatic]
   smarts: "n1ccccc1"
   display_smiles: "c1ccncc1"
 - name: indole
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen]
+  tags: [ring, nitrogen, aromatic]
   smarts: "c1ccc2nccc2c1"
   display_smiles: "c1ccc2[nH]ccc2c1"
 - name: phenothiazine
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen, sulfur]
+  tags: [ring, nitrogen, sulfur, aromatic]
   smarts: "*-[#7]-1-c2ccccc2-[#16]-c2ccccc-12"
   display_smiles: "c1ccc2c(c1)Nc1ccccc1S2"
 - name: acyl hydrazine
@@ -105,27 +105,27 @@
   display_smiles: "[*:1]C(=O)OC(=O)[*:2]"
 - name: beta-keto anhydride
   kind: functional_group
-  tags: [carbonyl, oxygen]
+  tags: [carbonyl]
   smarts: "[C,c](=O)[CX4,CR0X3,O][C,c](=O)"
   display_smiles: "[*:1]C(=O)CC(=O)[*:2]"
 - name: beta-lactam
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen, carbonyl]
+  tags: [ring, nitrogen, carbonyl]
   smarts: "[NX3]1[CX4][CX4][CX3]1(=[OX1])"
   display_smiles: "O=C1CCN1"
 - name: morpholine
   kind: chemical_building_block
-  tags: [heterocycle, nitrogen, oxygen]
+  tags: [ring, nitrogen, oxygen]
   smarts: "O1CC[NH1]CC1"
   display_smiles: "C1CNCCO1"
 - name: phenyl acetamide
   kind: functional_group
-  tags: [nitrogen, carbonyl]
+  tags: [ring, nitrogen, carbonyl, aromatic]
   smarts: "CC(=O)NC1=CC=CC=C1"
   display_smiles: "CC(=O)Nc1ccccc1"
 - name: sulfonamide
   kind: functional_group
-  tags: [sulfur, nitrogen]
+  tags: [sulfur, nitrogen, oxygen]
   smarts: "CS(=O)(=O)N"
   display_smiles: "[*:1]S(=O)(=O)N"
 - name: alkane
@@ -195,7 +195,7 @@
   display_smiles: "[*:1]CCl"
 - name: aryl halide
   kind: functional_group
-  tags: [halogen]
+  tags: [ring, halogen, aromatic]
   smarts: "[c][F,Cl,Br,I]"
   display_smiles: "Clc1ccccc1"
 - name: nitrile
@@ -220,22 +220,22 @@
   display_smiles: "[*:1]SS[*:2]"
 - name: tetrahydrofuran
   kind: chemical_building_block
-  tags: [heterocycle, oxygen]
+  tags: [ring, oxygen]
   smarts: "C1COCC1"
   display_smiles: "C1COCC1"
 - name: tetrahydrothiophene
   kind: chemical_building_block
-  tags: [heterocycle, sulfur]
+  tags: [ring, sulfur]
   smarts: "C1CSCC1"
   display_smiles: "C1CSCC1"
 - name: tetrahydropyran
   kind: chemical_building_block
-  tags: [heterocycle, oxygen]
+  tags: [ring, oxygen]
   smarts: "C1COCCC1"
   display_smiles: "C1COCCC1"
 - name: dioxane
   kind: chemical_building_block
-  tags: [heterocycle, oxygen]
+  tags: [ring, oxygen]
   smarts: "[$(O1CCOCC1),$(O1COCCC1)]"
   display_smiles: "C1COCOC1"
 - name: sulfide

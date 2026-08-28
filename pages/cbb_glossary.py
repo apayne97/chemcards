@@ -1,45 +1,51 @@
+"""Chemical Building Blocks glossary — covers both functional groups and chemical building
+blocks (the former separate Functional Group Glossary) as one browsable pool, with `kind`
+kept only as an internal filter facet."""
 import streamlit as st
 from rdkit.Chem import MolFromSmiles, MolFromSmarts
-from chemcards.database.cheminformatics import CHEMICAL_BUILDING_BLOCKS, FunctionalGroup
+from chemcards.database.cheminformatics import ALL_BUILDING_BLOCKS, FunctionalGroup, KIND_LABELS
 from utils import render_fg, all_tags
 
 
-def _atom_count(fg: FunctionalGroup) -> int:
-    mol = MolFromSmiles(fg.display_smiles) if fg.display_smiles else MolFromSmarts(fg.smarts)
+def _atom_count(entry: FunctionalGroup) -> int:
+    mol = MolFromSmiles(entry.display_smiles) if entry.display_smiles else MolFromSmarts(entry.smarts)
     return mol.GetNumHeavyAtoms() if mol else 0
 
 
 st.title("🧱 Chemical Building Blocks")
 st.caption(
-    "Heterocyclic ring scaffolds and other multi-part structures — bigger than a functional "
-    "group, but not a full drug."
+    "Functional groups, heterocyclic ring scaffolds, and other multi-part structures — "
+    "bigger than a single reactive group, but not a full drug."
 )
 
-available_tags = all_tags(CHEMICAL_BUILDING_BLOCKS)
+available_tags = all_tags(ALL_BUILDING_BLOCKS)
 
 with st.sidebar:
     st.markdown("### Filter")
     search = st.text_input("Search by name", "")
+    selected_kinds = st.multiselect("Kind", options=list(KIND_LABELS.values()),
+                                    default=list(KIND_LABELS.values()))
     selected_tags = st.multiselect("Tags", options=available_tags, default=[], placeholder="All tags")
 
-cbbs = CHEMICAL_BUILDING_BLOCKS
+entries = ALL_BUILDING_BLOCKS
 if search:
-    cbbs = [cbb for cbb in cbbs if search.lower() in cbb.name.lower()]
+    entries = [e for e in entries if search.lower() in e.name.lower()]
+entries = [e for e in entries if KIND_LABELS[e.kind] in selected_kinds]
 if selected_tags:
-    cbbs = [cbb for cbb in cbbs if set(cbb.tags) & set(selected_tags)]
+    entries = [e for e in entries if set(e.tags) & set(selected_tags)]
 
-if not cbbs:
+if not entries:
     st.info("No chemical building blocks match your search.")
 else:
     cols = st.columns(3)
-    for i, cbb in enumerate(sorted(cbbs, key=_atom_count)):
+    for i, entry in enumerate(sorted(entries, key=_atom_count)):
         with cols[i % 3]:
-            img = render_fg(cbb, size=200)
+            img = render_fg(entry, size=200)
             if img:
                 st.image(img)
-            st.caption(f"**{cbb.name}**")
-            if cbb.tags:
-                for tag in cbb.tags:
+            st.caption(f"**{entry.name}**")
+            if entry.tags:
+                for tag in entry.tags:
                     st.badge(tag)
             with st.expander("SMARTS"):
-                st.code(cbb.smarts, language=None)
+                st.code(entry.smarts, language=None)

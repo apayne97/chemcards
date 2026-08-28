@@ -1,4 +1,5 @@
 streamlit
+streamlit-ketcher
 rdkit
 pydantic
 pyyaml
