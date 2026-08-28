@@ -2,14 +2,13 @@
 
 The player is shown a mystery functional group (as a SMARTS pattern) and must
 name it.  Each guess is matched to the closest functional group in the
-database; five structural properties are shown as green / grey tiles:
-ring membership, aromaticity, and presence of N / O / S.
+database; seven structural properties (one per canonical tag) are shown as
+green / grey tiles.
 """
 import datetime
 import difflib
 import random
 import streamlit as st
-from rdkit import Chem
 
 from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, FunctionalGroup
 from utils import (
@@ -21,13 +20,12 @@ from utils import (
 MAX_GUESSES = 6
 P = "orgle_"
 
-TILE_DEFS = [
-    ("is_ring", "Ring"),
-    ("is_aromatic", "Aromatic"),
-    ("has_nitrogen", "Nitrogen"),
-    ("has_oxygen", "Oxygen"),
-    ("has_sulfur", "Sulfur"),
-]
+# One tile per canonical tag (see cheminformatics.CANONICAL_TAGS). Reading tags directly
+# instead of recomputing from SMARTS avoids a real bug the old RDKit-based computation had:
+# Chem.MolFromSmarts on a recursive SMARTS pattern like "[$(n1ncnc1),$(n1nncc1)]" (triazole,
+# oxazole, thiazole, dioxane) produces a single query atom with no materialized ring bonds, so
+# ring-perception calls like GetSSSR wrongly report 0 rings for those entries.
+TILE_TAGS = ["heterocycle", "hydrocarbon", "oxygen", "nitrogen", "halogen", "sulfur", "carbonyl"]
 
 
 def _k(key):
@@ -42,20 +40,6 @@ def build_filtered_fgs() -> list[FunctionalGroup]:
     return build_filtered_by_tags(FUNCTIONAL_GROUPS, P)
 
 
-def fg_properties(fg: FunctionalGroup) -> dict:
-    mol = Chem.MolFromSmarts(fg.smarts)
-    atoms = [a.GetAtomicNum() for a in mol.GetAtoms() if a.GetAtomicNum() > 0] if mol else []
-    aromatic = any(a.GetIsAromatic() for a in mol.GetAtoms()) if mol else False
-    is_ring = len(Chem.GetSSSR(mol)) > 0 if mol else False
-    return {
-        "is_ring": is_ring,
-        "is_aromatic": aromatic,
-        "has_nitrogen": 7 in atoms,
-        "has_oxygen": 8 in atoms,
-        "has_sulfur": 16 in atoms,
-    }
-
-
 def find_fg(query: str, pool: list[FunctionalGroup]) -> FunctionalGroup | None:
     q_norm = norm_name(query)
     best_ratio, best_fg = 0.0, None
@@ -67,15 +51,13 @@ def find_fg(query: str, pool: list[FunctionalGroup]) -> FunctionalGroup | None:
 
 
 def compare_fg(guess_fg: FunctionalGroup, target_fg: FunctionalGroup) -> list[dict]:
-    gp = fg_properties(guess_fg)
-    tp = fg_properties(target_fg)
     results = []
-    for prop, label in TILE_DEFS:
-        g_val = gp.get(prop)
-        t_val = tp.get(prop)
+    for tag in TILE_TAGS:
+        g_val = tag in guess_fg.tags
+        t_val = tag in target_fg.tags
         match = g_val == t_val
         display = "Yes" if g_val else "No"
-        results.append({"level": label, "match": match, "label": display})
+        results.append({"level": tag_label(tag), "match": match, "label": display})
     return results
 
 
@@ -153,7 +135,7 @@ def render_guess_row(guess_dict: dict):
     exact: bool = guess_dict["exact"]
     label = f"**{fg.name}**" + (" ✓" if exact else "")
     st.markdown(label)
-    cols = st.columns(5)
+    cols = st.columns(len(TILE_TAGS))
     for col, result in zip(cols, comparison):
         col.markdown(tile_html(result["label"], result["match"], result["level"]),
                      unsafe_allow_html=True)
@@ -167,8 +149,9 @@ def show_idle():
     st.title("⚗️ Orgle")
     st.markdown(
         "A Wordle-style organic chemistry game. A mystery SMARTS pattern is shown — "
-        "guess the functional group name. Each guess shows five structural properties as "
-        "green (match) or grey (no match) tiles: **Ring**, **Aromatic**, **N**, **O**, **S**."
+        "guess the functional group name. Each guess shows seven structural properties as "
+        "green (match) or grey (no match) tiles: " +
+        ", ".join(f"**{tag_label(t)}**" for t in TILE_TAGS) + "."
     )
     st.divider()
     col1, col2 = st.columns(2)
