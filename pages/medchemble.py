@@ -1,12 +1,21 @@
 """MedChemble — Wordle-style chemical building block identification game.
 
+Covers both functional groups and chemical building blocks (the former Orgle game) as one
+combined pool, presented under the "Chemical Building Block" umbrella — `kind` is kept only
+as an internal filter facet (see the sidebar), not a separate game.
+
 Two modes:
 - "Write the name": a mystery structure is shown, guess its name.
 - "Draw the Structure": a mystery *name* is shown, draw the matching structure using an
   embedded molecule editor (streamlit-ketcher / Ketcher) until it's an exact match.
 
-Either way, each guess is compared against the target on eight structural properties (one
-per canonical tag) shown as green / grey tiles.
+Either way, each guess is compared against the target on two rows of tiles:
+- Elements (O, N, S, F, Cl): green if the count matches exactly, yellow if it's present on
+  both sides but the wrong amount, like Wordle's "right letter, wrong spot". Br/I are real
+  but rare enough in this dataset that they aren't tracked as their own tile.
+- Ring / Carbonyl / Aromatic: plain green/grey presence-or-absence tiles. "Ring" means any
+  ring at all, carbocyclic or heterocyclic — a heterocycle is just a subset of it.
+Hydrocarbon isn't shown as its own tile — it's just "none of the above elements present".
 """
 import datetime
 import difflib
@@ -15,22 +24,26 @@ import streamlit as st
 from rdkit import Chem
 from streamlit_ketcher import st_ketcher
 
-from chemcards.database.cheminformatics import CHEMICAL_BUILDING_BLOCKS, FunctionalGroup, compute_tags
+from chemcards.database.cheminformatics import (
+    ALL_BUILDING_BLOCKS, FunctionalGroup, compute_tags, count_elements,
+)
 from utils import (
-    render_fg, render_mol, mcs_highlight_atoms, norm_name, tile_html, tag_label,
+    render_fg, render_mol, mcs_highlight_atoms, norm_name, tile_html, tile_html_tristate, tag_label,
     all_tags, counts_by_tag,
-    build_filtered_by_tags,
+    build_filtered_pool, init_kind_filter_state, show_kind_filter,
 )
 
 MAX_GUESSES = 6
 P = "cbbwordle_"
 
-# One tile per canonical tag (see cheminformatics.CANONICAL_TAGS). Reading tags directly
+# Plain presence/absence tiles (see cheminformatics.CANONICAL_TAGS). Reading tags directly
 # instead of recomputing from SMARTS avoids a real bug the old RDKit-based computation had:
 # Chem.MolFromSmarts on a recursive SMARTS pattern like "[$(n1ncnc1),$(n1nncc1)]" (triazole,
 # oxazole, thiazole, dioxane) produces a single query atom with no materialized ring bonds, so
 # ring-perception calls like GetSSSR wrongly report 0 rings for those entries.
-TILE_TAGS = ["heterocycle", "hydrocarbon", "oxygen", "nitrogen", "halogen", "sulfur", "carbonyl", "aromatic"]
+TILE_TAGS = ["ring", "carbonyl", "aromatic"]
+# Count-based tiles — see count_elements(). Order matches cheminformatics.ELEMENT_ATOMIC_NUMS.
+ELEMENT_TILES = ["O", "N", "S", "F", "Cl"]
 
 
 def _k(key):
@@ -41,32 +54,33 @@ def _date_seed() -> int:
     return int(datetime.date.today().strftime("%Y%m%d"))
 
 
-def _is_drawable(cbb: FunctionalGroup) -> bool:
+def _is_drawable(entry: FunctionalGroup) -> bool:
     """A target is only fair for "Draw the Structure" if a player could actually draw an
-    exact match — excludes entries whose display_smiles has an unfilled R-group wildcard
-    (just acylimidazole, currently)."""
-    return bool(cbb.display_smiles) and "*" not in cbb.display_smiles
+    exact match — excludes entries whose display_smiles is a substituent fragment with an
+    unfilled R-group wildcard (most plain functional groups; the ring-containing ones and all
+    chemical building blocks are complete molecules and pass)."""
+    return bool(entry.display_smiles) and "*" not in entry.display_smiles
 
 
 def _is_draw_mode() -> bool:
     return st.session_state.get(_k("answer_mode"), "Write the name") == "Draw the Structure"
 
 
-def build_filtered_cbbs() -> list[FunctionalGroup]:
-    pool = build_filtered_by_tags(CHEMICAL_BUILDING_BLOCKS, P)
+def build_filtered_bbs() -> list[FunctionalGroup]:
+    pool = build_filtered_pool(ALL_BUILDING_BLOCKS, P)
     if _is_draw_mode():
-        pool = [cbb for cbb in pool if _is_drawable(cbb)]
+        pool = [entry for entry in pool if _is_drawable(entry)]
     return pool
 
 
-def find_cbb(query: str, pool: list[FunctionalGroup]) -> FunctionalGroup | None:
+def find_entry(query: str, pool: list[FunctionalGroup]) -> FunctionalGroup | None:
     q_norm = norm_name(query)
-    best_ratio, best_cbb = 0.0, None
-    for cbb in pool:
-        ratio = difflib.SequenceMatcher(None, q_norm, norm_name(cbb.name)).ratio()
+    best_ratio, best_entry = 0.0, None
+    for entry in pool:
+        ratio = difflib.SequenceMatcher(None, q_norm, norm_name(entry.name)).ratio()
         if ratio > best_ratio:
-            best_ratio, best_cbb = ratio, cbb
-    return best_cbb if best_ratio >= 0.5 else None
+            best_ratio, best_entry = ratio, entry
+    return best_entry if best_ratio >= 0.5 else None
 
 
 def _compare_tags(guess_tags: set[str], target_tags: set[str]) -> list[dict]:
@@ -80,8 +94,23 @@ def _compare_tags(guess_tags: set[str], target_tags: set[str]) -> list[dict]:
     return results
 
 
-def compare_cbb(guess_cbb: FunctionalGroup, target_cbb: FunctionalGroup) -> list[dict]:
-    return _compare_tags(set(guess_cbb.tags), set(target_cbb.tags))
+def _compare_elements(guess_mol, target_mol) -> list[dict]:
+    guess_counts = count_elements(guess_mol)
+    target_counts = count_elements(target_mol)
+    results = []
+    for elem in ELEMENT_TILES:
+        g, t = guess_counts[elem], target_counts[elem]
+        state = "green" if g == t else "yellow"
+        results.append({"level": elem, "state": state, "label": str(g)})
+    return results
+
+
+def compare_entries(guess_entry: FunctionalGroup, target_entry: FunctionalGroup) -> tuple[list[dict], list[dict]]:
+    guess_mol = Chem.MolFromSmiles(guess_entry.display_smiles) if guess_entry.display_smiles else None
+    target_mol = Chem.MolFromSmiles(target_entry.display_smiles) if target_entry.display_smiles else None
+    comparison = _compare_tags(set(guess_entry.tags), set(target_entry.tags))
+    element_comparison = _compare_elements(guess_mol, target_mol)
+    return comparison, element_comparison
 
 
 # ---------------------------------------------------------------------------
@@ -96,14 +125,15 @@ def init_state():
         "answer_mode": "Write the name",
     }.items():
         st.session_state.setdefault(_k(key), val)
-    for tag in all_tags(CHEMICAL_BUILDING_BLOCKS):
+    for tag in all_tags(ALL_BUILDING_BLOCKS):
         st.session_state.setdefault(_k(f"tag_{tag}"), True)
+    init_kind_filter_state(P)
 
 
 def daily_game():
-    full_pool = [cbb for cbb in CHEMICAL_BUILDING_BLOCKS if cbb.tags]
+    full_pool = [entry for entry in ALL_BUILDING_BLOCKS if entry.tags]
     if _is_draw_mode():
-        full_pool = [cbb for cbb in full_pool if _is_drawable(cbb)]
+        full_pool = [entry for entry in full_pool if _is_drawable(entry)]
     if not full_pool:
         st.error("No chemical building blocks available.")
         return
@@ -115,7 +145,7 @@ def daily_game():
 
 
 def new_game():
-    pool = build_filtered_cbbs()
+    pool = build_filtered_bbs()
     if len(pool) < 2:
         st.error("Need at least 2 chemical building blocks — select more tags.")
         return
@@ -154,13 +184,15 @@ def show_answer_mode_selector():
 # Sidebar
 # ---------------------------------------------------------------------------
 def show_sidebar():
-    tags = all_tags(CHEMICAL_BUILDING_BLOCKS)
-    counts = counts_by_tag(CHEMICAL_BUILDING_BLOCKS)
+    tags = all_tags(ALL_BUILDING_BLOCKS)
+    counts = counts_by_tag(ALL_BUILDING_BLOCKS)
     with st.sidebar:
         st.button("📅 Today's Building Block", type="primary", use_container_width=True, on_click=daily_game)
         st.button("🎲 Random Building Block", use_container_width=True, on_click=new_game)
         st.divider()
-        st.markdown("### 🧱 Building Block Tags")
+        st.markdown("### ⚗️ Kind")
+        show_kind_filter(P)
+        st.markdown("### 🧱 Tags")
         c1, c2 = st.columns(2)
         if c1.button("All", key=_k("btn_all"), use_container_width=True):
             for tag in tags:
@@ -173,23 +205,30 @@ def show_sidebar():
         for tag in tags:
             st.checkbox(f"{tag_label(tag)} ({counts[tag]})", key=_k(f"tag_{tag}"))
         st.divider()
-        pool_size = len(build_filtered_cbbs())
+        pool_size = len(build_filtered_bbs())
         st.caption(f"{pool_size} chemical building blocks in random pool")
 
 
 # ---------------------------------------------------------------------------
 # Tile rendering
 # ---------------------------------------------------------------------------
-def render_guess_row(guess_dict: dict):
-    cbb: FunctionalGroup = guess_dict["cbb"]
-    comparison: list[dict] = guess_dict["comparison"]
-    exact: bool = guess_dict["exact"]
-    label = f"**{cbb.name}**" + (" ✓" if exact else "")
-    st.markdown(label)
-    cols = st.columns(len(TILE_TAGS))
-    for col, result in zip(cols, comparison):
+def _render_tile_rows(element_comparison: list[dict], comparison: list[dict]):
+    elem_cols = st.columns(len(ELEMENT_TILES))
+    for col, result in zip(elem_cols, element_comparison):
+        col.markdown(tile_html_tristate(result["label"], result["state"], result["level"]),
+                     unsafe_allow_html=True)
+    tag_cols = st.columns(len(TILE_TAGS))
+    for col, result in zip(tag_cols, comparison):
         col.markdown(tile_html(result["label"], result["match"], result["level"]),
                      unsafe_allow_html=True)
+
+
+def render_guess_row(guess_dict: dict):
+    entry: FunctionalGroup = guess_dict["entry"]
+    exact: bool = guess_dict["exact"]
+    label = f"**{entry.name}**" + (" ✓" if exact else "")
+    st.markdown(label)
+    _render_tile_rows(guess_dict["element_comparison"], guess_dict["comparison"])
     st.markdown("")
 
 
@@ -197,7 +236,6 @@ def render_drawn_guess_row(guess_dict: dict, n: int):
     """A guess row for "Draw the Structure" mode: the player's own drawn structure, with
     whatever part of it already matches the target (their maximum common substructure)
     highlighted — without revealing the rest of the target."""
-    comparison: list[dict] = guess_dict["comparison"]
     exact: bool = guess_dict["exact"]
     col_img, col_tiles = st.columns([1, 2])
     with col_img:
@@ -209,10 +247,7 @@ def render_drawn_guess_row(guess_dict: dict, n: int):
     with col_tiles:
         if exact:
             st.markdown("✓ Exact match!")
-        cols = st.columns(len(TILE_TAGS))
-        for col, result in zip(cols, comparison):
-            col.markdown(tile_html(result["label"], result["match"], result["level"]),
-                         unsafe_allow_html=True)
+        _render_tile_rows(guess_dict["element_comparison"], guess_dict["comparison"])
     st.markdown("")
 
 
@@ -220,13 +255,16 @@ def render_drawn_guess_row(guess_dict: dict, n: int):
 # Main game area
 # ---------------------------------------------------------------------------
 def show_idle():
-    st.title("🧱 MedChemble")
+    st.title("⚗️ MedChemble")
     st.markdown(
-        "A Wordle-style chemical building block identification game. **Write the name** "
-        "shows a mystery structure for you to name, or **Draw the Structure** gives you the "
-        "name and asks you to draw a matching structure. Each guess shows eight structural "
-        "properties as green (match) or grey (no match) tiles: " +
-        ", ".join(f"**{tag_label(t)}**" for t in TILE_TAGS) + "."
+        "A Wordle-style chemical building block identification game, covering both "
+        "functional groups and chemical building blocks. **Write the name** shows a mystery "
+        "structure for you to name, or **Draw the Structure** gives you the name and asks you "
+        "to draw a matching structure. Each guess shows two rows of tiles: "
+        "**Elements** (" + ", ".join(f"**{e}**" for e in ELEMENT_TILES) +
+        ") — green if the count matches exactly, yellow if present on both sides but the "
+        "wrong amount — and " + ", ".join(f"**{tag_label(t)}**" for t in TILE_TAGS) +
+        " as plain green (match) or grey (no match) tiles."
     )
     show_answer_mode_selector()
     st.divider()
@@ -250,10 +288,10 @@ def show_name_game():
     status: str = st.session_state[_k("game_status")]
     is_daily: bool = st.session_state.get(_k("is_daily"), False)
     n_guesses = len(guesses)
-    all_cbbs = CHEMICAL_BUILDING_BLOCKS
+    all_entries = ALL_BUILDING_BLOCKS
 
     title_suffix = " · 📅 Daily" if is_daily else ""
-    st.title(f"🧱 MedChemble{title_suffix}")
+    st.title(f"⚗️ MedChemble{title_suffix}")
     st.caption(f"Guess {n_guesses}/{MAX_GUESSES} · Identify the chemical building block")
     st.divider()
 
@@ -274,14 +312,15 @@ def show_name_game():
                 submitted = st.form_submit_button("Guess", type="primary",
                                                   use_container_width=True)
             if submitted and guess_input.strip():
-                matched = find_cbb(guess_input.strip(), all_cbbs)
+                matched = find_entry(guess_input.strip(), all_entries)
                 if matched is None:
                     st.warning("No matching chemical building block found.")
                 else:
-                    comparison = compare_cbb(matched, target)
+                    comparison, element_comparison = compare_entries(matched, target)
                     exact = norm_name(matched.name) == norm_name(target.name)
-                    guesses.append({"input": guess_input, "cbb": matched,
-                                    "comparison": comparison, "exact": exact})
+                    guesses.append({"input": guess_input, "entry": matched,
+                                    "comparison": comparison, "element_comparison": element_comparison,
+                                    "exact": exact})
                     st.session_state[_k("guesses")] = guesses
                     if exact:
                         st.session_state[_k("game_status")] = "won"
@@ -315,7 +354,7 @@ def show_draw_game():
     target_mol = Chem.MolFromSmiles(target.display_smiles)
 
     title_suffix = " · 📅 Daily" if is_daily else ""
-    st.title(f"🧱 MedChemble{title_suffix}")
+    st.title(f"⚗️ MedChemble{title_suffix}")
     st.caption(f"Guess {n_guesses}/{MAX_GUESSES} · Draw the structure")
     st.divider()
 
@@ -334,11 +373,12 @@ def show_draw_game():
             else:
                 guess_tags = compute_tags(guess_mol)
                 comparison = _compare_tags(guess_tags, set(target.tags))
+                element_comparison = _compare_elements(guess_mol, target_mol)
                 exact = Chem.MolToSmiles(guess_mol) == Chem.MolToSmiles(target_mol)
                 highlight_guess, _ = mcs_highlight_atoms(guess_mol, target_mol)
                 guesses.append({
-                    "mol": guess_mol, "comparison": comparison, "exact": exact,
-                    "highlight_atoms": highlight_guess,
+                    "mol": guess_mol, "comparison": comparison, "element_comparison": element_comparison,
+                    "exact": exact, "highlight_atoms": highlight_guess,
                 })
                 st.session_state[_k("guesses")] = guesses
                 if exact:
@@ -364,18 +404,19 @@ def show_draw_game():
         st.button("🎲 New Random Building Block", type="primary", use_container_width=True, on_click=new_game)
 
 
-def _show_draw_answer(cbb: FunctionalGroup, target_mol):
+def _show_draw_answer(entry: FunctionalGroup, target_mol):
     img = render_mol(target_mol, size=300)
     if img:
         st.image(img)
-    _show_answer_details(cbb)
+    _show_answer_details(entry)
 
 
-def _show_answer_details(cbb: FunctionalGroup):
+def _show_answer_details(entry: FunctionalGroup):
     with st.expander("Details"):
-        if cbb.tags:
-            st.markdown(f"**Tags:** {', '.join(tag_label(t) for t in cbb.tags)}")
-        st.code(cbb.smarts, language=None)
+        st.markdown(f"**Kind:** {tag_label(entry.kind)}")
+        if entry.tags:
+            st.markdown(f"**Tags:** {', '.join(tag_label(t) for t in entry.tags)}")
+        st.code(entry.smarts, language=None)
 
 
 # ---------------------------------------------------------------------------

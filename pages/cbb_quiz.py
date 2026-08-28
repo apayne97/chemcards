@@ -1,13 +1,19 @@
+"""Chemical Building Blocks Quiz — multiple-choice / type-answer quiz builder.
+
+Covers both functional groups and chemical building blocks (the former separate Functional
+Group Quiz) as one combined pool, presented under the "Chemical Building Block" umbrella —
+`kind` is kept only as an internal filter facet in the sidebar, not a separate quiz.
+"""
 import difflib
 import random
 import streamlit as st
 
-from chemcards.database.cheminformatics import CHEMICAL_BUILDING_BLOCKS, FunctionalGroup
+from chemcards.database.cheminformatics import ALL_BUILDING_BLOCKS, FunctionalGroup
 from chemcards.flashcards.multiplechoice import MultipleChoice
 from utils import (
     render_fg, norm_name, tag_label,
     all_tags, counts_by_tag,
-    build_filtered_by_tags,
+    build_filtered_pool, init_kind_filter_state, show_kind_filter,
     show_quiz_result,
 )
 
@@ -28,35 +34,36 @@ def init_state():
         "correct_last": None,
     }.items():
         st.session_state.setdefault(_k(key), val)
-    for tag in all_tags(CHEMICAL_BUILDING_BLOCKS):
+    for tag in all_tags(ALL_BUILDING_BLOCKS):
         st.session_state.setdefault(_k(f"tag_{tag}"), True)
+    init_kind_filter_state(P)
 
 
-def build_filtered_cbbs() -> list[FunctionalGroup]:
-    return build_filtered_by_tags(CHEMICAL_BUILDING_BLOCKS, P)
+def build_filtered_bbs() -> list[FunctionalGroup]:
+    return build_filtered_pool(ALL_BUILDING_BLOCKS, P)
 
 
-def next_question(filtered_cbbs: list[FunctionalGroup]) -> MultipleChoice:
-    sample_count = min(4, len(filtered_cbbs))
-    examples = random.sample(filtered_cbbs, sample_count)
+def next_question(filtered_bbs: list[FunctionalGroup]) -> MultipleChoice:
+    sample_count = min(4, len(filtered_bbs))
+    examples = random.sample(filtered_bbs, sample_count)
     correct = random.randrange(sample_count)
     return MultipleChoice(
         question="What is the name of this chemical building block?",
         display=examples[correct],
-        choices=[cbb.name for cbb in examples],
+        choices=[entry.name for entry in examples],
         answer_index=correct,
         answer_molecule=None,
     )
 
 
 def start_quiz():
-    filtered = build_filtered_cbbs()
+    filtered = build_filtered_bbs()
     if len(filtered) < 4:
         st.error("Need at least 4 chemical building blocks — select more tags.")
         return
     q = next_question(filtered)
     st.session_state[_k("current_question")] = q
-    st.session_state[_k("filtered_cbbs")] = filtered
+    st.session_state[_k("filtered_bbs")] = filtered
     st.session_state[_k("score")] = 0
     st.session_state[_k("total")] = 0
     st.session_state[_k("answered")] = False
@@ -65,7 +72,7 @@ def start_quiz():
 
 
 def reset_to_menu():
-    for key in ("current_question", "filtered_cbbs"):
+    for key in ("current_question", "filtered_bbs"):
         st.session_state[_k(key)] = None
     for key in ("score", "total"):
         st.session_state[_k(key)] = 0
@@ -79,12 +86,14 @@ def reset_to_menu():
 # Sidebar
 # ---------------------------------------------------------------------------
 def show_sidebar():
-    tags = all_tags(CHEMICAL_BUILDING_BLOCKS)
-    counts = counts_by_tag(CHEMICAL_BUILDING_BLOCKS)
+    tags = all_tags(ALL_BUILDING_BLOCKS)
+    counts = counts_by_tag(ALL_BUILDING_BLOCKS)
     mode = st.session_state[_k("mode")]
 
     with st.sidebar:
-        st.markdown("### 🧱 Building Block Tags")
+        st.markdown("### ⚗️ Kind")
+        show_kind_filter(P)
+        st.markdown("### 🧱 Tags")
         c1, c2 = st.columns(2)
         if c1.button("All", key=_k("btn_all"), use_container_width=True):
             for tag in tags:
@@ -101,7 +110,7 @@ def show_sidebar():
         st.radio("Answer mode", ["Multiple choice", "Type answer"], key=_k("answer_mode"))
         st.divider()
 
-        pool_size = len(build_filtered_cbbs())
+        pool_size = len(build_filtered_bbs())
         st.caption(f"{pool_size} chemical building blocks selected")
 
         if mode == "menu":
@@ -123,8 +132,8 @@ def show_sidebar():
 def show_menu():
     st.title("🧱 Chemical Building Blocks Quiz")
     st.markdown(
-        "Test your knowledge of heterocyclic ring scaffolds and other chemical building blocks. "
-        "Use the sidebar to filter by tag, then hit **Start Quiz**."
+        "Test your knowledge of functional groups and heterocyclic ring scaffolds. "
+        "Use the sidebar to filter by kind or tag, then hit **Start Quiz**."
     )
     st.divider()
     st.markdown(
@@ -137,7 +146,7 @@ def show_menu():
 # ---------------------------------------------------------------------------
 def show_quiz():
     q: MultipleChoice = st.session_state[_k("current_question")]
-    filtered_cbbs: list[FunctionalGroup] = st.session_state[_k("filtered_cbbs")]
+    filtered_bbs: list[FunctionalGroup] = st.session_state[_k("filtered_bbs")]
     score = st.session_state[_k("score")]
     total = st.session_state[_k("total")]
     answered = st.session_state[_k("answered")]
@@ -215,14 +224,15 @@ def show_quiz():
 
         if isinstance(q.display, FunctionalGroup):
             with st.expander("Building block details"):
-                cbb = q.display
-                st.markdown(f"**Name:** {cbb.name}")
-                if cbb.tags:
-                    st.markdown(f"**Tags:** {', '.join(tag_label(t) for t in cbb.tags)}")
-                st.code(cbb.smarts, language=None)
+                entry = q.display
+                st.markdown(f"**Name:** {entry.name}")
+                st.markdown(f"**Kind:** {tag_label(entry.kind)}")
+                if entry.tags:
+                    st.markdown(f"**Tags:** {', '.join(tag_label(t) for t in entry.tags)}")
+                st.code(entry.smarts, language=None)
 
         if st.button("Next Question", type="primary"):
-            st.session_state[_k("current_question")] = next_question(filtered_cbbs)
+            st.session_state[_k("current_question")] = next_question(filtered_bbs)
             st.session_state[_k("answered")] = False
             st.session_state[_k("correct_last")] = None
             st.rerun()

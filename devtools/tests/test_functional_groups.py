@@ -56,23 +56,15 @@ class TestFunctionalGroupTags:
             assert g["group_label"] == _GROUP_LABELS[_catalog_sort_key(by_name[g["name"]])[0]]
 
 
-HETEROCYCLE_TAG = "heterocycle"
-
-
 class TestFunctionalGroupVsChemicalBuildingBlockSplit:
+    """`kind` (functional_group vs chemical_building_block) is a content classification, not
+    a structural one — "ring" is a plain structural tag now (see CANONICAL_TAGS) and doesn't
+    imply kind either way. A handful of functional groups (aryl halide, the quinones, phenyl
+    acetamide) have a ring without being chemical building blocks in their own right."""
+
     def test_all_groups_have_a_kind(self, functional_groups):
         missing = [fg["name"] for fg in functional_groups if not fg.get("kind")]
         assert missing == [], f"Functional groups missing 'kind': {missing}"
-
-    def test_heterocycle_tag_entries_are_chemical_building_blocks(self, functional_groups):
-        mismatched = [
-            fg["name"] for fg in functional_groups
-            if HETEROCYCLE_TAG in fg.get("tags", [])
-            and fg.get("kind") != "chemical_building_block"
-        ]
-        assert mismatched == [], (
-            f"Entries tagged '{HETEROCYCLE_TAG}' not tagged kind=chemical_building_block: {mismatched}"
-        )
 
     def test_functional_groups_module_split_matches_yaml(self, functional_groups):
         from chemcards.database.cheminformatics import FUNCTIONAL_GROUPS, CHEMICAL_BUILDING_BLOCKS
