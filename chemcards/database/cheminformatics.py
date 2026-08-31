@@ -1,3 +1,4 @@
+import re
 from chemcards.database.core import MoleculeEntry
 from pydantic import BaseModel, Field
 from chemcards.database.resources import FUNCTIONAL_GROUPS_DATABASE
@@ -101,6 +102,120 @@ def count_elements(mol: "Chem.Mol") -> dict[str, int]:
         if name:
             counts[name] += 1
     return counts
+
+
+# ---------------------------------------------------------------------------
+# Naming segments — for MedChemble's "Write the name" mode. A small library of recognizable
+# IUPAC-ish prefixes/suffixes (from linear functional-group nomenclature, plus a few safe
+# Hantzsch-Widman-style heteroatom/ring-size roots for the curated ring systems) mapped to the
+# CANONICAL_TAGS chemistry each one implies. parse_naming_segments() scans arbitrary guess text
+# for these, longest match first, so a guess doesn't need to *be* the target's name to earn
+# credit — typing "propanol" against a target that has a hydroxyl group anywhere should still
+# light up the "-ol" tile, because the underlying chemistry is genuinely shared. Each entry is
+# (match_pattern, display_label, implied_tags) — the pattern is what's searched for (lowercase,
+# no spaces/hyphens); the label is what the player sees on the tile.
+#
+# Deliberately conservative: every pattern here is checked (in
+# devtools/tests/test_functional_groups.py) to never imply a tag that isn't actually true for
+# the curated entry whose name it's drawn from — no pattern is registered "for" one entry only,
+# since matching is a flat scan over whatever text is typed, checked against whatever the real
+# target's tags are, not against which entry a pattern was first written for. Two documented
+# exceptions where the implied chemistry can legitimately fall short (checked as such, not
+# excluded — see the test): "anhydride" against "beta-keto anhydride" (misnamed — it's actually
+# a 1,3-diketone, no O-bridge) and "amide" against "sulfonamide" (S-based, not C=O-based; it
+# also gets its own "sulfon-" prefix so the real chemistry still lands somewhere). A few other
+# things to know before touching this list:
+#   - "az"/"ole": oxazole's/imidazole's "-azo-" is NOT the azo (N=N) functional group — it's
+#     the elided Hantzsch-Widman "aza-" (nitrogen-in-ring) root running into the "-ole" (5-ring,
+#     unsaturated) suffix, spelled with only one "a" once elided (neither word contains "aza"
+#     as a literal substring). Split into these two so a guess like "imidazole" against target
+#     "oxazole" correctly credits nitrogen + ring/aromatic without implying an azo linkage.
+#   - "ox" (not "oxa"): in "oxazole", "oxa-" and "az-" overlap on the shared middle letter
+#     (ox-A-zole) — a non-overlapping scanner can only claim one interpretation of that letter,
+#     so if "oxa" (3 letters) claims it, "az" can no longer match right after. Shortening to
+#     "ox" (2 letters) leaves that shared letter for "az" to pick up, so oxazole correctly
+#     yields oxygen + nitrogen + ring/aromatic instead of losing the nitrogen tile.
+#   - "thio"/"thia": same sulfur root, two spellings depending on what follows (thiophene vs.
+#     thiazole) — both registered.
+#   - Retained/non-compositional names (morpholine, furan, pyrrole, indole's own base name,
+#     pyridine/pyrimidine, the tetrahydro-* saturated rings) intentionally have few or no
+#     segments — they lean on the letter-Wordle layer (wordle_letter_diff in utils.py) instead.
+NAMING_SEGMENTS: list[tuple[str, str, frozenset[str]]] = [
+    ("sulfon", "sulfon-", frozenset({"sulfur", "oxygen"})),
+    ("sulfoxide", "sulfoxide", frozenset({"sulfur", "oxygen"})),
+    ("sulfone", "sulfone", frozenset({"sulfur", "oxygen"})),
+    ("sulfide", "sulfide", frozenset({"sulfur"})),
+    ("disulfide", "disulfide", frozenset({"sulfur"})),
+    ("thiol", "-thiol", frozenset({"sulfur"})),
+    ("thio", "thio-", frozenset({"sulfur"})),
+    # 3 letters, not 4 ("thia"): same shared-letter overlap as oxa/az above — "thi" leaves the
+    # "a" free for "az" to claim in "thiazole" (thi-A-zole), so it correctly yields both sulfur
+    # and nitrogen instead of losing the nitrogen tile.
+    ("thi", "thia-", frozenset({"sulfur"})),
+    ("ox", "oxa-", frozenset({"oxygen"})),
+    ("ether", "ether", frozenset({"oxygen"})),
+    ("oicacid", "-oic acid", frozenset({"carbonyl", "oxygen"})),
+    ("oate", "-oate", frozenset({"carbonyl", "oxygen"})),
+    ("anhydride", "anhydride", frozenset({"carbonyl", "oxygen"})),
+    ("amide", "amide", frozenset({"carbonyl", "nitrogen"})),
+    ("urea", "urea", frozenset({"carbonyl", "nitrogen"})),
+    ("lactam", "lactam", frozenset({"ring", "nitrogen", "carbonyl"})),
+    ("keto", "keto-", frozenset({"carbonyl"})),
+    ("one", "-one", frozenset({"carbonyl"})),
+    ("acyl", "acyl-", frozenset({"carbonyl"})),
+    ("oyl", "-oyl", frozenset({"carbonyl"})),
+    ("quinone", "quinone", frozenset({"ring", "carbonyl"})),
+    ("ol", "-ol", frozenset({"oxygen"})),
+    ("amine", "amine", frozenset({"nitrogen"})),
+    ("imine", "imine", frozenset({"nitrogen"})),
+    ("nitrile", "nitrile", frozenset({"nitrogen"})),
+    ("hydrazine", "hydrazine", frozenset({"nitrogen"})),
+    ("nitro", "nitro-", frozenset({"nitrogen", "oxygen"})),
+    ("az", "aza-", frozenset({"nitrogen"})),
+    ("ole", "-ole", frozenset({"ring", "aromatic"})),
+    ("phenyl", "phenyl-", frozenset({"ring", "aromatic"})),
+    ("aryl", "aryl-", frozenset({"ring", "aromatic"})),
+    ("halide", "halide", frozenset({"halogen"})),
+    ("ane", "-ane", frozenset({"hydrocarbon"})),
+    ("ene", "-ene", frozenset({"hydrocarbon"})),
+    ("yne", "-yne", frozenset({"hydrocarbon"})),
+    ("methyl", "methyl", frozenset({"hydrocarbon"})),
+    ("ethyl", "ethyl", frozenset({"hydrocarbon"})),
+]
+# Longest pattern first so e.g. "sulfone" (7 letters) is tried before "sulfon" (6) at the same
+# starting position, and "sulfoxide" before "sulfo"-anything shorter.
+_NAMING_SEGMENTS_BY_LENGTH = sorted(NAMING_SEGMENTS, key=lambda item: -len(item[0]))
+
+# "-ane"/"-ene"/"-yne" (hydrocarbon) are real suffixes but short enough to false-match inside
+# an unrelated word ending the same way: "thiophene"/"tetrahydrothiophene" end in "...phene",
+# whose last three letters spell "ene"; "dioxane" ends in "...oxane", whose last three letters
+# spell "ane" (Hantzsch-Widman also reuses "-ane" for a saturated heterocycle, a different
+# meaning than the plain-hydrocarbon one this game tracks). Guard against both by refusing
+# these three specifically right after "h" or "x".
+_HYDROCARBON_SUFFIXES = {"ane", "ene", "yne"}
+
+
+def parse_naming_segments(text: str) -> list[tuple[str, frozenset[str]]]:
+    """Scan `text` for known naming segments, longest match first, left to right,
+    non-overlapping. Returns (display_label, implied_tags) for each segment found — the caller
+    checks that chemistry against the real target, not against the guess."""
+    if not text:
+        return []
+    lowered = re.sub(r"[^a-z]", "", text.lower())
+    found: list[tuple[str, frozenset[str]]] = []
+    i = 0
+    while i < len(lowered):
+        for pat, label, tags in _NAMING_SEGMENTS_BY_LENGTH:
+            if not lowered.startswith(pat, i):
+                continue
+            if pat in _HYDROCARBON_SUFFIXES and i > 0 and lowered[i - 1] in "hx":
+                continue
+            found.append((label, tags))
+            i += len(pat)
+            break
+        else:
+            i += 1
+    return found
 
 
 _ALL_FUNCTIONAL_GROUPS = [
