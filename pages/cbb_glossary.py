@@ -2,16 +2,17 @@
 blocks (the former separate Functional Group Glossary) as one browsable pool, with `kind`
 kept only as an internal filter facet."""
 import streamlit as st
-from rdkit.Chem import MolFromSmiles, MolFromSmarts
 from chemcards.database.cheminformatics import (
     ALL_BUILDING_BLOCKS, FunctionalGroup, KIND_LABELS, TAG_DESCRIPTIONS,
 )
+from chemcards.scripts.generate_catalog import _catalog_sort_key
 from utils import render_fg, all_tags, tag_label
 
 
-def _atom_count(entry: FunctionalGroup) -> int:
-    mol = MolFromSmiles(entry.display_smiles) if entry.display_smiles else MolFromSmarts(entry.smarts)
-    return mol.GetNumHeavyAtoms() if mol else 0
+def _sort_key(entry: FunctionalGroup):
+    """Same element-composition ordering as the PDF catalog (generate_catalog.py) — hydrocarbon,
+    then single-heteroatom groups, then multi-heteroatom, each acyclic-before-heterocycle."""
+    return _catalog_sort_key(entry.model_dump())
 
 
 st.title("🧱 Chemical Building Blocks")
@@ -48,7 +49,7 @@ if not entries:
     st.info("No chemical building blocks match your search.")
 else:
     cols = st.columns(3)
-    for i, entry in enumerate(sorted(entries, key=_atom_count)):
+    for i, entry in enumerate(sorted(entries, key=_sort_key)):
         with cols[i % 3]:
             img = render_fg(entry, size=200)
             if img:

@@ -272,6 +272,23 @@ def _multi_heteroatom_rank(counts: dict, present: list, name: str) -> tuple:
     return (len(present), _FULL_PRIORITY.index(defining), tier, counts["total"], name)
 
 
+def _is_heterocycle(mol) -> bool:
+    """A ring containing at least one non-carbon atom — not just "has a ring" (a purely
+    carbocyclic ring, e.g. para-quinone's, doesn't count). Computed directly from the mol
+    rather than read off a curated tag: the old "heterocycle" tag was folded into a broader
+    "ring" tag (any ring, carbocyclic or heterocyclic) in the FG/CBB merge, and neither "ring"
+    nor the plain O/N/S presence tags (which count heteroatoms anywhere in the molecule, not
+    specifically in a ring) preserve this narrower distinction on their own.
+    """
+    if mol is None:
+        return False
+    Chem.GetSSSR(mol)  # ensure ring perception is computed before touching GetRingInfo()
+    for ring in mol.GetRingInfo().AtomRings():
+        if any(mol.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in ring):
+            return True
+    return False
+
+
 def _catalog_sort_key(item: dict) -> tuple:
     """Acyclic entries first, then heterocycles (ring-tagged entries), each
     ordered hydrocarbon/none -> oxygen-only -> nitrogen-only -> sulfur-only
@@ -285,8 +302,8 @@ def _catalog_sort_key(item: dict) -> tuple:
     bucket.
     """
     name = (item.get("name") or "unknown").casefold()
-    is_cyclic = "heterocycle" in (item.get("tags") or [])
     mol = _entry_mol(item)
+    is_cyclic = _is_heterocycle(mol)
     c = _entry_atom_counts(mol)
     present = [e for e in ("O", "N", "S", "X") if c[e] > 0]
 
