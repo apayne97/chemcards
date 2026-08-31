@@ -3,8 +3,10 @@ blocks (the former separate Functional Group Glossary) as one browsable pool, wi
 kept only as an internal filter facet."""
 import streamlit as st
 from rdkit.Chem import MolFromSmiles, MolFromSmarts
-from chemcards.database.cheminformatics import ALL_BUILDING_BLOCKS, FunctionalGroup, KIND_LABELS
-from utils import render_fg, all_tags
+from chemcards.database.cheminformatics import (
+    ALL_BUILDING_BLOCKS, FunctionalGroup, KIND_LABELS, TAG_DESCRIPTIONS,
+)
+from utils import render_fg, all_tags, tag_label
 
 
 def _atom_count(entry: FunctionalGroup) -> int:
@@ -19,6 +21,14 @@ st.caption(
 )
 
 available_tags = all_tags(ALL_BUILDING_BLOCKS)
+
+with st.expander("What do the tags mean?"):
+    st.markdown(
+        "Every card below is tagged with the structural features it actually has — the same "
+        "tags MedChemble's naming-segment tiles check a guess's implied chemistry against."
+    )
+    for tag in sorted(available_tags):
+        st.markdown(f"**{tag_label(tag)}** — {TAG_DESCRIPTIONS.get(tag, '')}")
 
 with st.sidebar:
     st.markdown("### Filter")

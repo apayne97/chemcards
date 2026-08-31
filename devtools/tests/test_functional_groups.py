@@ -97,3 +97,34 @@ class TestFunctionalGroupVsChemicalBuildingBlockSplit:
             if compute_tags(mol) != set(fg.tags):
                 mismatches.append(fg.name)
         assert mismatches == [], f"compute_tags() disagrees with curated tags for: {mismatches}"
+
+    def test_naming_segments_never_imply_untrue_chemistry(self):
+        """parse_naming_segments() (MedChemble's "Write the name" naming-segment tiles) scans
+        arbitrary guess text for known prefixes/suffixes and checks the chemistry each implies
+        against the real target — so a segment implying a tag a matching entry doesn't actually
+        have would show up as a misleading tile. Two entries are documented, deliberate
+        exceptions (checked here, not excluded from the scan) rather than bugs: "beta-keto
+        anhydride" is structurally a 1,3-diketone with no O-bridge despite the name, and
+        "sulfonamide" is S-based rather than C=O-based, so the generic "amide" segment
+        correctly falls short of carbonyl for it. Everything else must imply only tags that
+        are actually true for the entry whose own name is being scanned."""
+        from chemcards.database.cheminformatics import (
+            FUNCTIONAL_GROUPS, CHEMICAL_BUILDING_BLOCKS, parse_naming_segments,
+        )
+
+        known_exceptions = {
+            "beta-keto anhydride": {"oxygen"},
+            "sulfonamide": {"carbonyl"},
+        }
+
+        unexpected = []
+        for fg in FUNCTIONAL_GROUPS + CHEMICAL_BUILDING_BLOCKS:
+            implied: set[str] = set()
+            for _label, tags in parse_naming_segments(fg.name):
+                implied |= tags
+            extra = implied - set(fg.tags)
+            if extra and extra != known_exceptions.get(fg.name, set()):
+                unexpected.append((fg.name, extra))
+        assert unexpected == [], (
+            f"parse_naming_segments() implies tags not in curated tags: {unexpected}"
+        )

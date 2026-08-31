@@ -4,18 +4,22 @@ Covers both functional groups and chemical building blocks (the former Orgle gam
 combined pool, presented under the "Chemical Building Block" umbrella — `kind` is kept only
 as an internal filter facet (see the sidebar), not a separate game.
 
-Two modes:
-- "Write the name": a mystery structure is shown, guess its name.
+Two modes, compared very differently:
+- "Write the name": a mystery structure is shown, guess its name. Each guess gets a literal
+  Wordle letter-by-letter diff against the target's name, plus a second row of naming-segment
+  tiles — recognized IUPAC-ish prefixes/suffixes in what you typed (aza-, -ol, sulfon-, ...),
+  each checked against the target's *actual* chemistry rather than its spelling. Guessing
+  "propanol" against a target that really does have a hydroxyl group lights up "-ol" green even
+  though the full name is wrong — see cheminformatics.NAMING_SEGMENTS for the mapping.
 - "Draw the Structure": a mystery *name* is shown, draw the matching structure using an
-  embedded molecule editor (streamlit-ketcher / Ketcher) until it's an exact match.
-
-Either way, each guess is compared against the target on two rows of tiles:
-- Elements (O, N, S, F, Cl): green if the count matches exactly, yellow if it's present on
-  both sides but the wrong amount, like Wordle's "right letter, wrong spot". Br/I are real
-  but rare enough in this dataset that they aren't tracked as their own tile.
-- Ring / Carbonyl / Aromatic: plain green/grey presence-or-absence tiles. "Ring" means any
-  ring at all, carbocyclic or heterocyclic — a heterocycle is just a subset of it.
-Hydrocarbon isn't shown as its own tile — it's just "none of the above elements present".
+  embedded molecule editor (streamlit-ketcher / Ketcher) until it's an exact match. Each guess
+  is compared against the target on two rows of tiles:
+  - Elements (O, N, S, F, Cl): green if the count matches exactly, yellow if it's present on
+    both sides but the wrong amount, like Wordle's "right letter, wrong spot". Br/I are real
+    but rare enough in this dataset that they aren't tracked as their own tile.
+  - Ring / Carbonyl / Aromatic: plain green/grey presence-or-absence tiles. "Ring" means any
+    ring at all, carbocyclic or heterocyclic — a heterocycle is just a subset of it.
+  Hydrocarbon isn't shown as its own tile — it's just "none of the above elements present".
 """
 import datetime
 import difflib
@@ -25,12 +29,13 @@ from rdkit import Chem
 from streamlit_ketcher import st_ketcher
 
 from chemcards.database.cheminformatics import (
-    ALL_BUILDING_BLOCKS, FunctionalGroup, compute_tags, count_elements,
+    ALL_BUILDING_BLOCKS, FunctionalGroup, compute_tags, count_elements, parse_naming_segments,
 )
 from utils import (
     render_fg, render_mol, mcs_highlight_atoms, norm_name, tile_html, tile_html_tristate, tag_label,
     all_tags, counts_by_tag,
     build_filtered_pool, init_kind_filter_state, show_kind_filter,
+    wordle_letter_diff, letters_row_html,
 )
 
 MAX_GUESSES = 6
@@ -105,12 +110,28 @@ def _compare_elements(guess_mol, target_mol) -> list[dict]:
     return results
 
 
-def compare_entries(guess_entry: FunctionalGroup, target_entry: FunctionalGroup) -> tuple[list[dict], list[dict]]:
-    guess_mol = Chem.MolFromSmiles(guess_entry.display_smiles) if guess_entry.display_smiles else None
-    target_mol = Chem.MolFromSmiles(target_entry.display_smiles) if target_entry.display_smiles else None
-    comparison = _compare_tags(set(guess_entry.tags), set(target_entry.tags))
-    element_comparison = _compare_elements(guess_mol, target_mol)
-    return comparison, element_comparison
+def _compare_name_segments(guess_text: str, target: FunctionalGroup) -> list[dict]:
+    """Naming-segment tiles for "Write the name" mode: scan the raw guess text for recognized
+    naming segments, and check the chemistry each implies against the target's *real* tags —
+    not against the target's spelling. Tri-state: green if every implied tag is actually true,
+    yellow if only some are, grey if none are (or nothing recognized)."""
+    target_tags = set(target.tags)
+    results = []
+    for label, implied_tags in parse_naming_segments(guess_text):
+        true_count = sum(1 for tag in implied_tags if tag in target_tags)
+        if true_count == len(implied_tags):
+            state = "green"
+        elif true_count > 0:
+            state = "yellow"
+        else:
+            state = "grey"
+        # Shown as the tile's small caption — without it, a tile like "-ole" going green
+        # against a target that isn't actually a 5-membered ring (CANONICAL_TAGS tracks "ring"
+        # as a plain boolean, not ring size) reads as a mystery instead of a coarser-than-it-
+        # looks match on "ring, aromatic" specifically.
+        chemistry = ", ".join(tag_label(t) for t in sorted(implied_tags))
+        results.append({"level": chemistry, "state": state, "label": label})
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -242,12 +263,20 @@ def _render_tile_rows(element_comparison: list[dict], comparison: list[dict]):
                      unsafe_allow_html=True)
 
 
-def render_guess_row(guess_dict: dict):
-    entry: FunctionalGroup = guess_dict["entry"]
+def render_name_guess_row(guess_dict: dict):
+    """A guess row for "Write the name" mode: the guessed text as Wordle letter tiles against
+    the target's actual name, plus a row of naming-segment tiles for whatever prefixes/suffixes
+    were recognized in it (see _compare_name_segments)."""
     exact: bool = guess_dict["exact"]
-    label = f"**{entry.name}**" + (" ✓" if exact else "")
+    label = f"**{guess_dict['input']}**" + (" ✓" if exact else "")
     st.markdown(label)
-    _render_tile_rows(guess_dict["element_comparison"], guess_dict["comparison"])
+    st.markdown(letters_row_html(guess_dict["letters"]), unsafe_allow_html=True)
+    segments = guess_dict["segments"]
+    if segments:
+        seg_cols = st.columns(len(segments))
+        for col, result in zip(seg_cols, segments):
+            col.markdown(tile_html_tristate(result["label"], result["state"], result["level"]),
+                         unsafe_allow_html=True)
     st.markdown("")
 
 
@@ -277,10 +306,16 @@ def show_idle():
     st.title("⚗️ MedChemble")
     st.markdown(
         "A Wordle-style chemical building block identification game, covering both "
-        "functional groups and chemical building blocks. **Write the name** shows a mystery "
-        "structure for you to name, or **Draw the Structure** gives you the name and asks you "
-        "to draw a matching structure. Each guess shows two rows of tiles: "
-        "**Elements** (" + ", ".join(f"**{e}**" for e in ELEMENT_TILES) +
+        "functional groups and chemical building blocks.\n\n"
+        "**Write the name** shows a mystery structure for you to name. Each guess gets a "
+        "letter-by-letter Wordle diff against the real name, plus a row of naming-segment "
+        "tiles — recognized prefixes/suffixes in what you typed (like *aza-*, *-ol*, "
+        "*sulfon-*) checked against the target's real chemistry, not its spelling. Guessing "
+        "\"propanol\" against something that really has a hydroxyl group still lights up "
+        "*-ol* green, even if the rest of the name is wrong.\n\n"
+        "**Draw the Structure** gives you the name and asks you to draw a matching structure. "
+        "Each guess shows two rows of tiles: **Elements** (" +
+        ", ".join(f"**{e}**" for e in ELEMENT_TILES) +
         ") — green if the count matches exactly, yellow if present on both sides but the "
         "wrong amount — and " + ", ".join(f"**{tag_label(t)}**" for t in TILE_TAGS) +
         " as plain green (match) or grey (no match) tiles."
@@ -322,7 +357,7 @@ def show_name_game():
 
     with col_game:
         for g in guesses:
-            render_guess_row(g)
+            render_name_guess_row(g)
 
         if status == "playing":
             with st.form(key=_k(f"guess_form_{n_guesses}"), clear_on_submit=True):
@@ -331,14 +366,16 @@ def show_name_game():
                 submitted = st.form_submit_button("Guess", type="primary",
                                                   use_container_width=True)
             if submitted and guess_input.strip():
-                matched = find_entry(guess_input.strip(), all_entries)
+                guess_text = guess_input.strip()
+                matched = find_entry(guess_text, all_entries)
                 if matched is None:
                     st.warning("No matching chemical building block found.")
                 else:
-                    comparison, element_comparison = compare_entries(matched, target)
-                    exact = norm_name(matched.name) == norm_name(target.name)
+                    letters = wordle_letter_diff(guess_text, target.name)
+                    segments = _compare_name_segments(guess_text, target)
+                    exact = norm_name(guess_text) == norm_name(target.name)
                     guesses.append({"input": guess_input, "entry": matched,
-                                    "comparison": comparison, "element_comparison": element_comparison,
+                                    "letters": letters, "segments": segments,
                                     "exact": exact})
                     st.session_state[_k("guesses")] = guesses
                     if exact:

@@ -71,6 +71,45 @@ def tile_html_tristate(label: str, state: str, level: str) -> str:
     return _tile_div(_TILE_STATE_COLORS.get(state, _TILE_STATE_COLORS["grey"]), label, level)
 
 
+def wordle_letter_diff(guess: str, target: str) -> list[dict]:
+    """Classic Wordle per-letter diff, generalized to unequal lengths (chemical names aren't
+    fixed-width): green = right letter, right position; yellow = the letter is in the target
+    but not at that position, and not already accounted for by a duplicate; grey = not in the
+    target at all (or every copy of it is already accounted for). Standard two-pass algorithm
+    so a repeated letter in the guess doesn't over-claim yellow beyond how many copies the
+    target actually has left after greens are removed.
+    """
+    guess, target = norm_name(guess), norm_name(target)
+    states = ["grey"] * len(guess)
+    remaining = Counter(target)
+    for i, ch in enumerate(guess):
+        if i < len(target) and ch == target[i]:
+            states[i] = "green"
+            remaining[ch] -= 1
+    for i, ch in enumerate(guess):
+        if states[i] == "green":
+            continue
+        if remaining.get(ch, 0) > 0:
+            states[i] = "yellow"
+            remaining[ch] -= 1
+    return [{"letter": ch, "state": state} for ch, state in zip(guess, states)]
+
+
+def letters_row_html(diff: list[dict]) -> str:
+    """Render a wordle_letter_diff() result as one inline row of small Wordle-style letter
+    boxes (one HTML block, not st.columns() — a name can run to a dozen-plus letters, which
+    would make a per-letter column layout wrap awkwardly)."""
+    boxes = "".join(
+        f"<div style='background:{_TILE_STATE_COLORS.get(r['state'], _TILE_STATE_COLORS['grey'])};"
+        f"color:white;width:2em;height:2em;border-radius:4px;margin:2px;"
+        f"display:flex;align-items:center;justify-content:center;"
+        f"font-family:monospace;font-weight:700;font-size:1em;text-transform:uppercase;'>"
+        f"{r['letter']}</div>"
+        for r in diff
+    )
+    return f"<div style='display:flex;flex-wrap:wrap;'>{boxes}</div>"
+
+
 def show_quiz_result(score: int, total: int, on_back) -> None:
     st.title("Quiz Complete!")
     pct = round(100 * score / total) if total > 0 else 0
