@@ -125,7 +125,12 @@ def _compare_name_segments(guess_text: str, target: FunctionalGroup) -> list[dic
             state = "yellow"
         else:
             state = "grey"
-        results.append({"level": "", "state": state, "label": label})
+        # Shown as the tile's small caption — without it, a tile like "-ole" going green
+        # against a target that isn't actually a 5-membered ring (CANONICAL_TAGS tracks "ring"
+        # as a plain boolean, not ring size) reads as a mystery instead of a coarser-than-it-
+        # looks match on "ring, aromatic" specifically.
+        chemistry = ", ".join(tag_label(t) for t in sorted(implied_tags))
+        results.append({"level": chemistry, "state": state, "label": label})
     return results
 
 

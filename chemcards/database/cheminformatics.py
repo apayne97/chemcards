@@ -29,7 +29,24 @@ class FunctionalGroup(BaseModel):
 # rather than a Pydantic Literal, since the chemical building blocks list is expected to keep
 # growing with new tags (amino_acid, nucleotide, metabolite, etc.) as content is added.
 CANONICAL_TAGS = {
-    "ring", "nitrogen", "oxygen", "sulfur", "carbonyl", "halogen", "hydrocarbon", "aromatic",
+    "ring", "ring_5", "ring_6", "nitrogen", "oxygen", "sulfur", "carbonyl", "halogen",
+    "hydrocarbon", "aromatic",
+}
+
+# Plain-language description of what each tag actually means — shown in the glossary so the
+# tags on every card (and MedChemble's naming-segment tiles, which check a guess's implied
+# chemistry against these same tags) aren't just unexplained words.
+TAG_DESCRIPTIONS: dict[str, str] = {
+    "ring": "Contains at least one ring, carbocyclic or heterocyclic.",
+    "ring_5": "Contains a 5-membered ring (e.g. furan, pyrrole, thiazole).",
+    "ring_6": "Contains a 6-membered ring (e.g. pyridine, morpholine).",
+    "nitrogen": "Contains at least one nitrogen atom.",
+    "oxygen": "Contains an oxygen atom that isn't a carbonyl's own =O.",
+    "sulfur": "Contains at least one sulfur atom.",
+    "carbonyl": "Contains a C=O group.",
+    "halogen": "Contains fluorine, chlorine, bromine, or iodine.",
+    "hydrocarbon": "Made of only carbon and hydrogen — no heteroatoms at all.",
+    "aromatic": "Contains an aromatic ring system.",
 }
 
 _HALOGEN_ATOMIC_NUMS = {9, 17, 35, 53}
@@ -76,9 +93,19 @@ def compute_tags(mol: "Chem.Mol") -> set[str]:
         tags.add("oxygen")
 
     # "ring" means any ring at all — carbocyclic (benzene, para-quinone) or heterocyclic
-    # (pyridine, furan). A heterocycle is just a subset of this, not a separate tag.
-    if mol.GetRingInfo().AtomRings():
+    # (pyridine, furan). A heterocycle is just a subset of this, not a separate tag. "ring_5"/
+    # "ring_6" narrow that down by ring *size* — added specifically so naming-segment tiles
+    # like "-ole" (a real 5-ring suffix) don't light up green against a 6-ring target just
+    # because both happen to be "ring, aromatic" (caught via oxazole/pyridazine mix-ups in
+    # MedChemble's naming-Wordle mode). A fused system can carry both (indole has one 5-ring
+    # and one 6-ring); either size present is enough for its tag, independent of the other.
+    ring_sizes = {len(ring) for ring in mol.GetRingInfo().AtomRings()}
+    if ring_sizes:
         tags.add("ring")
+    if 5 in ring_sizes:
+        tags.add("ring_5")
+    if 6 in ring_sizes:
+        tags.add("ring_6")
 
     return tags
 
@@ -172,7 +199,11 @@ NAMING_SEGMENTS: list[tuple[str, str, frozenset[str]]] = [
     ("hydrazine", "hydrazine", frozenset({"nitrogen"})),
     ("nitro", "nitro-", frozenset({"nitrogen", "oxygen"})),
     ("az", "aza-", frozenset({"nitrogen"})),
-    ("ole", "-ole", frozenset({"ring", "aromatic"})),
+    # "ring_5", not the generic "ring" — "-ole" specifically names a 5-membered ring (Hantzsch-
+    # Widman), so it shouldn't light up green against a 6-membered target just because both are
+    # "some kind of aromatic ring" (caught via a pyrazole guess going green against a pyridazine
+    # target, which only shares nitrogen + *a* ring, not a 5-membered one).
+    ("ole", "-ole", frozenset({"ring_5", "aromatic"})),
     ("phenyl", "phenyl-", frozenset({"ring", "aromatic"})),
     ("aryl", "aryl-", frozenset({"ring", "aromatic"})),
     ("halide", "halide", frozenset({"halogen"})),
