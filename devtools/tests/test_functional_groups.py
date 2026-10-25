@@ -55,6 +55,36 @@ class TestFunctionalGroupTags:
         for g in sorted_groups:
             assert g["group_label"] == _GROUP_LABELS[_catalog_sort_key(by_name[g["name"]])[0]]
 
+    def test_catalog_sort_key_puts_real_heterocycles_in_heterocycle_buckets(self, functional_groups):
+        """Regression test for a real bug: the `heterocycle`→`ring` tag migration (broadened to
+        any ring, carbocyclic or heterocyclic) left `_catalog_sort_key` still checking for the
+        no-longer-existing "heterocycle" string, silently routing every ring-tagged entry into
+        the acyclic buckets instead. Genuine heterocycles (a ring with a heteroatom actually in
+        it) must land in one of the heterocycle buckets (5/6/7/7.5); purely carbocyclic
+        ring entries (e.g. para-quinone — its oxygens are exocyclic carbonyls, not in the ring)
+        must not."""
+        from chemcards.scripts.generate_catalog import _catalog_sort_key
+
+        known_heterocycles = {
+            "thiophene", "furan", "pyrrole", "imidazole", "pyrazole", "triazole", "pyrimidine",
+            "pyridazine", "pyrazine", "oxazole", "thiazole", "pyridine", "indole",
+            "phenothiazine", "morpholine", "beta-lactam", "acylimidazole", "tetrahydrofuran",
+            "tetrahydrothiophene", "tetrahydropyran", "dioxane",
+        }
+        heterocycle_groups = {5, 6, 7, 7.5}
+
+        mismatches = []
+        for fg in functional_groups:
+            group = _catalog_sort_key(fg)[0]
+            is_bucketed_as_heterocycle = group in heterocycle_groups
+            should_be = fg["name"] in known_heterocycles
+            if is_bucketed_as_heterocycle != should_be:
+                mismatches.append((fg["name"], group, should_be))
+        assert mismatches == [], (
+            f"_catalog_sort_key heterocycle bucketing disagrees with expectations "
+            f"(name, actual_group, should_be_heterocycle): {mismatches}"
+        )
+
 
 class TestFunctionalGroupVsChemicalBuildingBlockSplit:
     """`kind` (functional_group vs chemical_building_block) is a content classification, not
